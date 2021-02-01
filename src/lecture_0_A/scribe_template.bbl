@@ -1,0 +1,17 @@
+\begin{thebibliography}{1}
+
+\bibitem{littlestone1989weighted}
+N.~Littlestone, M.~K. Warmuth, et~al.
+\newblock {\em The weighted majority algorithm}.
+
+\bibitem{littman2015reinforcement}
+M.~L. Littman.
+\newblock Reinforcement learning improves behaviour from evaluative feedback.
+\newblock {\em Nature}, 521(7553):445--451, 2015.
+
+\bibitem{novikoff1963convergence}
+A.~B. Novikoff.
+\newblock On convergence proofs for perceptrons.
+\newblock Technical report, Stanford Research Inst Menlo Park CA, 1963.
+
+\end{thebibliography}
