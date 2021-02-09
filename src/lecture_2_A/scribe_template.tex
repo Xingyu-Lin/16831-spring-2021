@@ -74,6 +74,7 @@
 \parindent 0in
 \parskip 1.5ex
 %\renewcommand{\baselinestretch}{1.25}
+% \newtheorem{theorem}{Theorem}
 
 \begin{document}
 
@@ -182,13 +183,6 @@ As both supervised learning algorithms, and online learning algorithms, learn mo
 \normalfont
 To motivate the use of PWEA, we will present a learning problem involving gamblers and racehorses. In this motivating example, we have a set of expert gamblers who routinely bet on horses. As an outsider, we intend on identifying the best expert from the set of experts and mimic their bets. We start by weighing all the experts equally. Next, we update our weights based on the accuracy of each expert. We penalize the experts who incorrectly predicted the outcome of the horse race, by reducing their share of weights to zero. Then, we reinitialize our distribution of weights by equally distributing the weights among experts who correctly predicted the outcome of the race. This process is repeated iteratively until we converge to the subset of the best experts.
 
-\begin{figure}[ht]
-    \centering
-    \includegraphics[width=0.5\textwidth]{ContinuousUniformDistributionPdfExample_01.png}
-    \caption{The figure illustrates the iterative concentration of weights by removing under-performing experts. In the figure shown above, we start with the dotted black distribution, re-weight our belief to obtain the dotted blue distribution, and finally re-weight again to converge on the red distribution. The red distribution illustrates the convergence and identification of the best expert from the set of experts.}
-    \label{fig:weighting}
-\end{figure}
-
 The pseudo-code for the PWEA algorithm is summarized in Algorithm \ref{algo:pwea} below. The update equations on line 8 state that the set $E$ is updated based on the performance of each expert. Experts that perform poorly are removed from the set, and experts that succeed, remain in the set under consideration. The performance is evaluated by an external black-box entity, represented as Nature in Algorithm \ref{algo:pwea}. 
 
 \begin{algorithm}[H]
@@ -210,13 +204,6 @@ PWEA has the characteristics of an online learning algorithm. It is suitable for
 \subsection{Greedy/Consistent Algorithm}
 \normalfont
 The Consistent (Greedy) Algorithm is similar to the PWEA mentioned in the last section; however, the expert selection is slightly modified. The Consistent algorithm does not maintain a set, like the PWEA. Instead, the algorithm maintains a stack, and pop's experts from the stack based on their performance. The algorithm will converge once the best expert has been encountered. It should be noted that the greedy algorithm need not investigate every expert nor empty the stack to converge upon the best expert. Assuming a \textit{best expert} exists, then it will take a maximum of $N$ trials to identify the expert, where $N$ is the number of experts. One drawback of this method is that it can only identify at the most one expert. Thus, if the set of \textit{best experts} comprises of more than one element, this method will fail to identify all experts in the desired set.
-
-\begin{figure}[ht]
-    \centering
-    \includegraphics[width=0.5\textwidth]{stack_pop_operation.jpg}
-    \caption{Expert pop operation on the stack of experts}
-    \label{fig:stack pop}
-\end{figure}
 
 Before formally presenting the greedy algorithm, we will introduce the notation required to mathematically ground the algorithm. We define the instance domain $\chi$ as the set of all possible outcomes. Intuitively, this can be thought of as the set of all possible \textit{advice} expressed by each expert. We denote the advice of all the experts at a given timestamp $t$, as a vector $x^{(t)}$, which has the dimensionality based on the size of the number of experts. Next, we define the target domain $\mathcal{Y}$, which is the space of all outcome values for each expert. We denote the outcome of all the experts at a given timestamp $t$, as a vector $y^{(t)}$, which has the dimensionality based on the size of the number of experts. Finally, we define the hypothesis class $\mathcal{H}$, as the set of all selector or indicator functions. Intuitively, this can be thought of as a way to poll a given expert. We can write the relationship between vectors in these three spaces as follows:
 \begin{align}
@@ -266,27 +253,63 @@ The greedy algorithm delineated in Algorithm \ref{algo:greedy}, details the proc
 
 The greedy algorithm has a fair set of assumptions, specifically in terms of realizability \cite{ohta1984reachability}. We assume that there exists a hypothesis $h^*$ that maps $\chi \to \mathcal{Y}$.
 
+It is worthwhile noting that the consistent algorithm makes mistakes before identifying the perfect hypothesis. As demonstrated in Fig \ref{fig:loss}, these mistakes would result in a loss compared to the case where we knew the perfect hypothesis in hindsight. In the next section, the upper bound of the number of such mistakes is discussed.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{fig2.png}
+    \caption{Loss in Winnings}
+    \label{fig:loss}
+\end{figure}
+
+
+
 \subsection{Analysis of the Consistent Algorithm}
 
-Assume realizability (the perfect hypothesis is in the hypothesis class); it is known that the version space will converge to the set only containing perfect hypotheses, after enough mistakes are made. The question is, is there an upper bound for the number of mistakes the algorithm could make, before it eliminates all imperfect hypotheses? The answer is $|\mathcal{H}|-1=E-1$.
+Assume realizability (the perfect hypothesis is in the hypothesis class); it is known that the version space will converge to the set only containing perfect hypotheses, after enough mistakes are made. The question is, is there an upper bound for the number of mistakes the algorithm could make, before it eliminates all imperfect hypotheses? 
 
-Proof: at any timestamp $t$, if the prediction algorithm makes a mistake, it must result from a (the first) hypothesis in the version space. The algorithm then removes this hypothesis, as well as all other hypotheses that yielded the same output, from the version space. If the algorithm did not make a mistake, then the version space stays the same. Let $p^{(t)}\in\{1,0\}$ denote whether the prediction algorithm makes a mistake at $t$, then the iteration of the size of the version space may be expressed as follows: 
+\begin{theorem}
+Let $p^{(t)}\in\{1,0\}$ denote whether the consistent algorithm makes a mistake at an arbitrary timestamp $t$. Let $M_c(\mathcal{H})\doteq\sum_{\tau=0}^{t-1}p^{(\tau)}$ represent the total number of mistakes made by the algorithm. Then, $M_c(\mathcal{H})\leq |\mathcal{H}|-1$.
+\end{theorem}
+
+\begin{proof}
+At any timestamp $\tau$, the following relationship holds true:
 \begin{equation}
-    \forall t:|V^{(t)}|\leq|V^{(t-1)}|-p^{(t-1)}\Rightarrow |V^{(t)}|\leq |V^{(0)}|-\sum_{\tau=0}^{t-1}p^{(\tau)}=|\mathcal{H}|-\sum_{\tau=0}^{t-1}p^{(\tau)}
+    |V^{(\tau)}|\leq|V^{(\tau-1)}|-p^{(\tau-1)}
+    \label{eqn:iter}
+\end{equation}
+because the algorithm removes at least one (the first) hypothesis from the version space after a mistake was made.
+
+Taking the summation on both sides of the equation \ref{eqn:iter} from timestamp $\tau=1$ to any $t$ yields:
+\begin{equation}
+    \forall t:\sum_{\tau=1}^t|V^{(\tau)}|\leq \sum_{\tau=0}^{t-1}|V^{(\tau)}|-\sum_{\tau=0}^{t-1}p^{(\tau)}
+    \label{eqn:summation}
+\end{equation}
+
+With basic algebra, equation \ref{eqn:summation} evaluates to:
+\begin{equation}
+    \forall t:|V^{(t)}|\leq |V^{(0)}|-\sum_{\tau=0}^{t-1}p^{(\tau)}=|\mathcal{H}|-\sum_{\tau=0}^{t-1}p^{(\tau)}
     \label{eq:ana1}
 \end{equation}
-Note that the inequity is due to the scenario where multiple hypothesis provided wrong outputs.
+Note that the initial version space is identical to the entire hypothesis space $\mathcal{H}$.
 
-Because of the assumption of reliability, for all timestamps, there exists at least one perfect hypothesis in the version space.
+Under the assumption of realizability, it is guaranteed that the version space always contains a perfect hypothesis:
 \begin{equation}
     \forall t: |V^{(t)}|\geq 1
     \label{eq:ana2}
 \end{equation}
 
-Combine the equations \ref{eq:ana1} and \ref{eq:ana2}, we have the number of mistakes made up to any arbitrary timestamp $t$:
+Combining equation \ref{eq:ana1} and \ref{eq:ana2}, we bound the size of the version space:
 \begin{equation}
-    \forall t: M_c(\mathcal{H})\doteq\sum_{\tau=0}^{t-1}p^{(\tau)}\leq |\mathcal{H}|-1
+    \forall t: 1\leq|V^{(t)}|\leq |\mathcal{H}|-\sum_{\tau=0}^{t-1}p^{(\tau)}
 \end{equation}
+Substitute in the notation of $M_c(\mathcal{H})$, the upper bound of total mistakes made by the consistent algorithm is:
+\begin{equation}
+    M_c(\mathcal{H})\leq |\mathcal{H}|-1
+\end{equation}
+\end{proof}
+
+
 
 From the derivation above, we conclude the common strategy for bound derivations.
 \begin{itemize}
@@ -297,10 +320,23 @@ From the derivation above, we conclude the common strategy for bound derivations
     \item Use algebra or approximation to get the performance bound.
 \end{itemize}
 
-It is worth noting that online learning theory focuses on the theoretical bounds of algorithm performance. Such guarantees are often vital to the reliability demands in robotic systems.
+It is worth mentioning that online learning theory focuses on the theoretical bounds of algorithm performance. Such guarantees are often vital to the reliability demands in robotic systems.
 
 \bibliography{refs}
 \bibliographystyle{abbrv}
+
+\newpage
+\section{Appendix}
+
+We found an image that helps illustrate weighting in a general PWEA:
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{ContinuousUniformDistributionPdfExample_01.png}
+    \caption{Weighting in PWEA.}
+    \label{fig:weighting}
+\end{figure}
+
+Figure \ref{fig:weighting} above shows the iterative concentration of weights by removing under-performing experts. We start with the dotted black distribution, re-weight our belief to obtain the dotted blue distribution, and finally re-weight again to converge on the red distribution. The red distribution illustrates the convergence and identification of the best expert from the set of experts.
 
 \end{document}
 
