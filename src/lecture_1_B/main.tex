@@ -11,7 +11,7 @@
 
 \newcommand\X{\mathcal{X}}
 \newcommand\Y{\mathcal{Y}}
-\newcommand\H{\mathcal{H}}
+\newcommand\HH{\mathcal{H}}
 
 \DeclareMathOperator*{\minimize}{min}
 \DeclareMathOperator*{\maximize}{max}
@@ -124,7 +124,7 @@ With the Greedy/Consistent algorithm, the system uses a learning rule where it p
 
 There are multiple issues with this strategy, the most obvious one being if realizability is not met, the algorithm will no longer have a pool of experts to pick from and will terminate. The fact that algorithm requires strict consistency also may eliminate an expert who is reasonably good but not perfect if the expert makes a mistake at an early timestep.
 
-Now we define our problem space formally: we have the instance domain $\X$, or the set of possible observations that can be seen any timestep t; the target domain $\Y$, or the set of possible outcomes that can occur; and the hypothesis class $\{h: \X \rightarrow \Y \}$, a series of functions mapping an element in the instance domain to an element in the target domain, each of which determines how we will make a prediction based on the observations we see. The Version space at time $t$ is defined as the set of experts whom we still trust at time $t$; all experts in the version space at time $t$ have not yet made a mistake. Then, the Greedy Algorithm pseudocode is listed in algorithm \ref{algo:greedy}.
+Now we define our problem space formally: we have the instance domain $\X$, or the set of possible observations that can be seen any timestep $t$; the target domain $\Y$, or the set of possible outcomes that can occur; and the hypothesis class $\HH = \{h: \X \rightarrow \Y \}$, a series of functions mapping an element in the instance domain to an element in the target domain, each of which determines how we will make a prediction based on the observations we see. The Version space $\mathbf{V}^{(t)}$ at time $t$ is defined as the set of experts whom we still trust at time $t$; all experts in the version space at time $t$ have not yet made a mistake. Then, the Greedy Algorithm pseudocode is listed in algorithm \ref{algo:greedy}.
 
 \begin{algorithm}[H]
 \caption{Greedy / Consistent Algorithm}
@@ -143,24 +143,26 @@ Now we define our problem space formally: we have the instance domain $\X$, or t
 
 \subsection{Bounds on the number of mistakes the greedy algorithm will make}
 
-\theorem{(Mistake bound of Consistent Algorithm) Let $M_C(\mathcal{H})$ be the total number of mistakes made by the Consistent Algorithm under the realizability assumption and the assumption that there is at least one expert in the starting Version space. Then, $M_C(\mathcal{H})$ is upper-bounded as:
+\theorem{(Mistake bound of Consistent Algorithm)
+Let $M_C^{(t)}(\mathcal{H})$ be the total number of mistakes made by the Consistent Algorithm by timestep $t$ for hypothesis class $\HH$. Assuming realizability and that there is at least one expert in the starting Version space $\V^{(1)}$, then $M_C^{(T)}(\HH)$ is upper-bounded as:
+ 
 $$M_C(\mathcal{H}) \le |\mathcal{H}| -1$$
 \label{theorem:greedy}}
-\proof{Initially, there are E experts, so: $$|\mathbf{V}^{(1)}| = E}$$
+\proof{Initially, there are $|\HH|$ experts, so: $$|\mathbf{V}^{(1)}| = |\HH|$$
 If the consistent algorithm makes a mistake at time $t$, then:
 $$|\mathbf{V}^{(t+1)}| \le |\mathbf{V}^{(t)}| - 1$$
-holds because we remove at least one expert from the Version space, including the expert whose advice we had just followed. So after M mistakes, at step t:
-$$|\mathbf{V}^{(t)}| \le |\mathcal{H}| - M$$
+holds because we remove at least one expert from the Version space $\mathbf{V}$, including the expert whose advice we had just followed. So after $M_C$ mistakes, at step $t$:
+$$|\mathbf{V}^{(t)}| \le |\mathcal{H}| - M_C$$
 This is an upper bound on the size of the version space at time t.
 For the lower bound: since we assume realizability, then there is at least one expert at any time t:
 $$|\mathbf{V}^{(t)}| \ge  1$$ 
 Putting the upper and lower bound together, we get:
-$$1 \le |\mathbf{V}^{(t)}| \le |\mathcal{H}| - M $$ 
+$$1 \le |\mathbf{V}^{(t)}| \le |\mathcal{H}| - M_C $$ 
 Thus:
-$$M \le |\mathcal{H}| - 1 $$
+$$M_C \le |\mathcal{H}| - 1 $$
 \QED}
 
-The implications of theorem \ref{theorem:greedy} are that in the best-case, it will take us at least 1 mistake to discover the true expert (and thus the optimal expert-following strategy). In this best case, all experts except for the perfect expert will fail on the first timestep. In the worst-case, only the expert we decide to trust fails at each mistake made, and thus we must make $\mathcal{M}$ mistakes before discovering the true expert.
+The implications of theorem \ref{theorem:greedy} are that in the best-case, it will take us at least 1 mistake to discover the true expert (and thus the optimal expert-following strategy). In this best case, all experts except for the perfect expert will fail on the first timestep. In the worst-case, only the expert we decide to trust fails at each mistake made, and thus we must make $M_C  \le |\mathcal{H}| - 1$ mistakes before discovering the true expert.
 
 In terms of time: in the best case, on the first timestep,  all experts except for the perfect expert fail, and thus we discover the true expert. In the worst case, the perfect expert and one or more near-perfect experts all do not fail for a large number of timesteps, before the near-perfect experts finally fail. In this case, it takes us many timesteps to discover the true expert.
 
