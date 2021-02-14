@@ -126,21 +126,21 @@ The Halving algorithm improves the mistake bound of the Consistent Algorithm sig
 \subsection{Worst-case Mistake Bounds for the Halving Algorithm}
 
 \theorem{\textbf{(Mistake bound of Halving Algorithm)} Let $M_H^{(t)}(\mathcal{H})$ be the total number of mistakes made by the Halving Algorithm by timestep $t$ for hypothesis class $\HH$. Assuming realizability and that there is at least one expert in the starting Version space $\V$, $M_H^{(T)}(\mathcal{H})$ is upper-bounded as:
-$$M_H^{(T)}(\mathcal{H}) \le \log_{\frac{1}{|\Y|}}|\mathcal{H}| $$
+$$M_H^{(T)}(\mathcal{H}) \le \log_2|\mathcal{H}| $$
 \label{theorem:greedy}}
 \proof{We use induction to establish an upper bound on the size of the Version space at time $t$.\\Initially, there are $|\HH|$ experts, so our base case is: $$|\mathbf{V}^{(1)}| = |\HH|}$$
 Now our inductive step. If the algorithm makes a mistake at time $t$, then:
-$$|\mathbf{V}^{(t+1)}| \le \frac{1}{|\Y|} \cdot |\mathbf{V}^{(t)}|}$$
-Because the algorithm picks the highest-represented decision at each time $t$, we know at least $\frac{1}{|\Y|} \cdot |\V^{(t)}|$ experts followed the (wrong) decision we had just picked, and thus at most $\frac{1}{|\Y|}\cdot |\V^{(t)}|$ experts followed the correct decision. Eliminating the $\frac{|\Y|-1}{|\Y|}|\V|$ incorrect experts from the Version space, we are left with just the $\frac{1}{|\Y}\cdot |\V^{(t)}|$ correct experts by timestep $t+1$ . So after $M_H^{(t)}$ mistakes, at step $t$:
-$$|\mathbf{V}^{(t)}| \le \Bigg(\frac{1}{|\Y|}\Bigg)^{M_{H}^{(t)}} \cdot |\mathcal{H}|$$
+$$|\mathbf{V}^{(t+1)}| \le \frac{1}{2} \cdot |\mathbf{V}^{(t)}|}$$
+Because the algorithm picks the highest-represented decision at each time $t$, if the algorithm makes a mistake on time $t$, we know at most $\frac{1}{2}$ experts followed the correct decision but no more. Eliminating the incorrect experts from the Version space, we are left with at most $\frac{1}{2}$ of the remaining at $t+1$. So after $M_H^{(t)}$ mistakes, at step $t$:
+$$|\mathbf{V}^{(t)}| \le \Bigg(\frac{1}{2}\Bigg)^{M_{H}^{(t)}} \cdot |\mathcal{H}|$$
 This is an upper bound on the size of the version space at time t.
 \\For the lower bound: since we assume realizability, then there is at least one expert at any time t:
 $$|\mathbf{V}^{(t)}| \ge  1$$ 
 Putting the upper and lower bounds together, we get:
-$$1 \le \Bigg(\frac{1}{|\Y|}\Bigg)^{M_{H}^{(t)}} \cdot |\mathcal{H}| $$ 
-Note $0\le\frac{1}{|\Y|}< 1$. Simplifying:
-$$|\Y|^{M_{H}^{(t)}} \le |\mathcal{H}|$$
-$$M_{H}^{(t)} \le \log_{|\Y|}|\mathcal{H}|$$
+$$1 \le \Bigg(\frac{1}{2}\Bigg)^{M_{H}^{(t)}} \cdot |\mathcal{H}| $$ 
+Simplifying:
+$$2^{M_{H}^{(t)}} \le |\mathcal{H}|$$
+$$M_{H}^{(t)} \le \log_{2}|\mathcal{H}|$$
 \QED}
 
 \section{Randomized Greedy Algorithm}
