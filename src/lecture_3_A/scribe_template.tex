@@ -1,0 +1,341 @@
+\documentclass[11pt]{article}
+\usepackage{latexsym}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{epsfig}
+\usepackage[tight]{subfigure}
+
+\usepackage{amsmath}
+
+\DeclareMathOperator*{\minimize}{min}
+\DeclareMathOperator*{\maximize}{max}
+
+\usepackage{algorithm}
+ %on linux you may need to run sudo apt-get install texlive-full to install algorithm.sys
+\usepackage{algorithmic}
+
+\usepackage{verbatim}
+
+\newcommand{\handout}[5]{
+  \noindent
+  \begin{center}
+  \framebox{
+    \vbox{
+      \hbox to 5.78in { {#1} \hfill #2 }
+      \vspace{4mm}
+      \hbox to 5.78in { {\Large \hfill #5  \hfill} }
+      \vspace{2mm}
+      \hbox to 5.78in { {\em #3 \hfill #4} }
+    }
+  }
+  \end{center}
+  \vspace*{4mm}
+}
+
+\newcommand{\lecture}[5]{\handout{#1}{#2}{#3}{#4}{#5}}
+\newcommand{\collision}[0]{\mathrm{collision}}
+\newcommand{\nocollision}[0]{\overline{\collision}}
+
+\newcommand*{\QED}{\hfill\ensuremath{\square}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{observation}[theorem]{Observation}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{note}[theorem]{Note}
+
+% 1-inch margins, from fullpage.sty by H.Partl, Version 2, Dec. 15, 1988.
+\topmargin 0pt
+\advance \topmargin by -\headheight
+\advance \topmargin by -\headsep
+\textheight 8.9in
+\oddsidemargin 0pt
+\evensidemargin \oddsidemargin
+\marginparwidth 0.5in
+\textwidth 6.5in
+
+\parindent 0in
+\parskip 1.5ex
+%\renewcommand{\baselinestretch}{1.25}
+
+\begin{document}
+
+\lecture{Statistical Techniques in Robotics (16-831, S20)}{Lecture \#04
+  (Monday, January 13)}{Lecturer: Kris Kitani}{Scribes: Vikas Raunak, Sang Keun Choe}{PWEA (RWMA) \& OLC (Perceptron)}
+
+\section{Review}
+In the last lectures, on the topic of Prediction with Expert Advice (PWEA), we had analyzed three main algorithms: (1) Greedy, (2) Halving, and (3) Randomized Greedy. In this lecture, we will introduce and analyze two more algorithms for the PWEA problem, namely: the Weighted Majority Algorithm (WMA) and the Randomized Weighted Majority Algorithm (RWMA). For a quick high level takeaway, we note that the Weighted Majority Algorithm (WMA) has a bounded regret, while the RWMA is our first no regret algorithm. This lecture, after the review section, will derive these results. In the next two subsections, we first recap the problem of prediction with expert advice and a few definitions to help us along the way in deriving those results.
+
+%This section serves as a review of the previous lecture and any other context required to frame the content of the current lecture. 
+
+%You may format the scribes in any way you like, aside from changing font style, size and page format. Please use subsections and paragraphs to increase the readability of your notes.
+
+%Length requirement 1-2 pages.
+        
+\subsection{Prediction with Expert Advice}
+We recall the characteristics of the problem of Prediction with Expert Advice \cite{littman2015reinforcement} (an online learning problem):
+\begin{enumerate}
+    \item One-Shot: The data arrives as a stream, but its sequence is not correlated.
+    \item Instructive: We receive a fully observable loss based on the prediction made.
+    \item Exhaustive: We will eventually have access to the entire state and action space.
+\end{enumerate}
+Clearly, the key distinction from supervised learning setting arises from the fact that there is no distinct train and test stage, and input \& output are given in sequence. This distinction also leads to a different kind of analysis, in terms of bounds on mistakes and regrets, as we will develop later.
+
+\subsection{Realizability}
+
+\definition{\normalfont\textbf{Realizability} is the assumption that the learner has access to the perfect hypothesis.}
+
+\normalfont
+To discuss further, we recall that under the conditions of realizability, the performance is measured in terms of the mistake bound, which represents, in retrospect, the cost for not following the perfect hypothesis. Under this assumption of realizability, previously we had seen the halving (Majority) algorithm, which maintains a set of hypothesis (the version space) consistent with past evidence, i.e. it predicts according to the majority vote of hypothesis from the version space. We had also obtained the mistake bound of the halving algorithm to be logarithmic in the number of hypotheses, since it removes at least half the hypotheses after one mistake. 
+
+However, we will now relax this realizability assumption and allow even the best expert to make a few mistakes. Under these new conditions of non-realizability, we will evaluate the performance of the algorithm in terms of the \textit{regret bound} instead of the \textit{mistake bound}. In such a case, we would like to design algorithms demonstrating small regrets. Accordingly, we start with providing the (mathematical) definition of regret below.
+\definition{\normalfont\textbf{Regret} of the learner, $R^{(T)}(H)$, is the cumulative loss for not following the best hypothesis in the hypothesis class $H$. Regret can be mathematically formulated as follows:}
+\begin{align}
+    R^{(T)}(H)=\sum_{t=1}^{T} l(\hat{y}^{(t)}, y^{(t)}) - \minimize_{h\in H}  \sum_{t=1}^{T} l(h(x^{(t)}), y^{(t)})\label{def:regret}
+\end{align}
+\normalfont
+where, $\sum_{t=1}^{T} l(\hat{y}^{(t)}, y^{(t)})$ represents the cumulative loss of the learner, and $\minimize\sum_{t=1}^{T} l(h(x^{(t)}), y^{(t)})$ represents the loss of best single hypothesis. 
+
+Clearly, the regret bound is a more general performance bound, of which the mistake bound is a special case. In this lecture, we will use the regret bound to characterize online algorithms and conversely, we will be interested in finding good algorithms as characterized by this regret bound. We recall that in previous lectures, we had assumed at least one perfect algorithm, which implies realizability. However, in this lecture, the first algorithm we will consider is under the relaxed assumption of non-realizability, namely, the Weighted Majority Algorithm (WMA), which has a multiplicative weighting on the experts that decays with the number of mistakes.
+
+\definition{\normalfont\textbf{Potential Function} is the sum of the weights, a non-integer scalar equivalent to the size of the version space, used in the context of Weighted Majority algorithms.}
+
+\section{Summary}
+\subsection{Weighted Majority Algorithm (WMA)}
+\normalfont
+The Weighted Majority \cite{littlestone1989weighted} is listed as Algorithm \ref{algo:wma} below. The update equation on line 7 states that the weights are updated when the learner's prediction doesn't match the actual answer. It is important to note this simple weight update rule, which we will be making use of in our regret bound analysis.
+
+\begin{algorithm}[H]
+\caption{Weighted Majority Algorithm (WMA)}
+\label{algo:wma}
+\begin{algorithmic}[1]
+\STATE $\textbf{w}^{(1)} \leftarrow \{w_n^{(1)}=1\}_{n=1}^N$ \hfill $\triangleright$ Weight initialization
+\STATE $\eta\leq\frac{1}{2}$\hfill $\triangleright$ Penalty rate initialization
+\FOR{$t=1,\;\cdots,\;T$}
+\STATE \textsc{Receive} ($\textbf{x}^{(t)}\in\{-1, 1\}^N$) \hfill $\triangleright$ Receive expert predictions
+\STATE $\hat{y}^{(t)} = \text{sign}\Big(\sum_{n=1}^Nx_n^{(t)}\cdot w_n^{(t)}\Big)\in\{-1, 1\}$ \hfill $\triangleright$ Make learner prediction
+\STATE \textsc{Receive} ($y^{(t)}\in\{-1, 1\}$) \hfill $\triangleright$ Receive actual answer
+\STATE $w_n^{(t+1)}\leftarrow w_n^{(t)}\big(1-\eta\cdot\textbf{1}[y^{(t)}\neq x_n^{(t)}]\big)$ \hfill $\triangleright$ Weight update
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+
+Moving ahead, the key question is that if WMA makes a mistake, how much does the potential change? At a high level, we want the upper bound of the potential function. Formally, we derive the results below. But first we state a lemma, which will be useful in deriving the regret bound.
+
+\lemma{For $0<x<1$, following two inequalities hold: 
+\begin{align}
+    -x-x^2\leq\log(1-x)\label{eq:ineq2}\\
+    \log(1-x)\leq-x\label{eq:ineq1}
+\end{align}}\label{lemma:1}
+\proof{One can easily prove the above inequalities by applying Taylor series to $\log(1-x)$.}
+
+\theorem{(Mistake bound of WMA) Let $M^{(t)},\;m_i^{(t)}$ respectively be the number of mistakes that have been made by the WMA learner and the $i$-th hypothesis until the time step $t$, and $N, \eta$ be the number of experts and the penalty rate. Then, $M^{(t)}$ is upper-bounded as:
+$$M^{(t)}\leq 2(1+\eta)m_i^{(t)} + \frac{2\log{N}}{\eta}$$}\label{theorem:wma}
+\proof{Lets define the potential function $\Phi^{(t)}$ for WMA as follows:
+\begin{align}
+  \Phi^{(t)} = \sum_{n=1}^N w_n^{(t)}  
+\end{align}
+where, $w_n^{(t)}$ is the weight for the expert $n$ at time step $t$.
+
+Suppose the learner made a mistake at the time step $t$. Since the majority rule implies at least half of weighted experts are mistaken, corresponding at least half of weights will accordingly be penalized by $(1-\eta)$, and this leads to the following inequality:
+\begin{align}
+  \Phi^{(t+1)}\leq\Phi^{(t)}\Big(\frac{1}{2} + \frac{1}{2}(1-\eta) \Big) = \Big(1-\frac{\eta}{2}\Big)\Phi^{(t)}
+\end{align}
+By assuming all weights are initialized to 1 and recursively applying the above inequality, we can derive the upper bound of the potential function as follows:
+\begin{align}
+    \Phi^{(t+1)}\leq \Phi^{(1)}\Big(1-\frac{\eta}{2}\Big)^{M^{(t)}}=N\Big(1-\frac{\eta}{2}\Big)^{M^{(t)}}\label{eq:wma_upper}
+\end{align}
+From the definition of the potential function, we can also derive the lower-bound of the potential function as follows:
+\begin{align}
+    \Phi^{(t+1)} = \sum_{n=1}^N w_n^{(t+1)} \geq w_n^{(t+1)}\;\;\;\text{for all}\;1\leq n\leq N \label{eq:wma_lower}
+\end{align}
+The above inequality comes from the fact that every weight $w_n^{(t+1)}$ is positive, since they are both initialized and multiplied with positive values.
+
+Moreover, by the weight update rule of WMA, we can analytically calculate $w_n^{(t+1)}$ as follows:
+\begin{align}
+    w_n^{(t+1)} = w_n^{(1)}(1-\eta)^{m_n^{(t)}}= 1\cdot(1-\eta)^{m_n^{(t)}}\label{eq:weight}
+\end{align}
+
+By combining Eq. (\ref{eq:wma_upper}) $\sim$ (\ref{eq:weight}), we can now derive the mathematical relation between $M^{(t)}$ and $m_n^{(t)}$:
+\begin{align}
+    (1-\eta)^{m_n^{(t)}} \leq \Phi^{(t+1)}\leq N\Big(1-\frac{\eta}{2}\Big)^{M^{(t)}} \label{eq:wma_init}
+\end{align}
+Finally, we can compute the (upper) bound of mistake $M^{(t)}$ by combining the bounds of $\Phi^{(t+1)}$ (Eq. (\ref{eq:wma_init})) and Lemma \ref{lemma:1} as follows:
+\begin{align*}
+    m_n^{(t)}\log(1-\eta) &\leq \log N + M^{(t)}\log\Big(1-\frac{\eta}{2}\Big)\;\;\;(\text{by applying log to Eq. (\ref{eq:wma_init})})\\
+    m_n^{(t)}(-\eta-\eta^2) &\leq \log N + M^{(t)}\log\Big(1-\frac{\eta}{2}\Big)\;\;\;(\because\; \text{Lemma}\;\ref{lemma:1})\\
+    m_n^{(t)}(-\eta-\eta^2) &\leq \log N + M^{(t)}\Big(-\frac{\eta}{2}\Big)\;\;\;(\because\; \text{Lemma}\;\ref{lemma:1})\\
+    M^{(t)}\Big(\frac{\eta}{2}\Big)&\leq\log N + m_n^{(t)}(\eta+\eta^2)\\
+    M^{(t)}&\leq\frac{2\log N}{\eta} + 2m_n^{(t)}(1+\eta)\;\;\;\forall n
+\end{align*}
+Therefore, we have obtained the upper bound of mistakes for WMA.\QED}
+
+Now, let's compare the mistake bound of WMA with algorithms from the previous lectures: earlier, the upper bound always depended on the number of experts (e.g. logarithmically in the Halving (Majority) Algorithm). However, here one of the terms ($2m_n^{(t)}(1+\eta)$) is based on the number of mistakes an expert makes. 
+
+Further, recall from Section 1.2 that we conduct our analysis using the \textit{regret bound} instead of the mistake bound under the condition of non-realizability. Before going from the mistake bound to the regret bound, we state the definition of a no-regret algorithm below.
+
+\definition{\normalfont The algorithm is a \textbf{no-regret} algorithm if and only if $\frac{R(h)}{T}\rightarrow0$ as $T\rightarrow\infty$.}
+
+\normalfont
+The above definition means that as $T\rightarrow\infty$, $\frac{R(h)}{T}\rightarrow0$ (regret divided by T) or average regret over time goes to zero. 
+%To reiterate, the regret of the algorithm is the difference in the cumulative loss between the best expert and your algorithm.
+We will now prove below that WMA shows only a bounded-regret propert, not a no-regret property.
+
+\theorem{WMA is \textbf{not} a no-regret algorithm.}
+\proof{By the definition of regret and Theorem \ref{theorem:wma}, we can obtain the upper bound of \textit{regret} of WMA, $R(h_n)$, as follows:
+\begin{align}
+    R(h_n) = M^{(T)} - m_n^{(T)} \leq m_n^{(T)} + 2\eta m_n^{(T)} + \frac{2\log N}{\eta}
+\end{align}
+Since $m_n^{(T)}$ follows $O(T)$ and $2\eta m_n^{(T)} + \frac{2\log N}{\eta} > 0$, the upper bound of the \textit{average regret} over time, $\frac{R(h_n)}{T}$, cannot be smaller than $O(1)$, which doesn't converge to 0 as $T\rightarrow\infty$.
+Thus, WMA is not a no-regret algorithm.\QED
+}
+
+To analyze further, the LHS term in Eq. (10) is the regret bound of the weighted majority algorithm. We want to ask what kind of regret algorithm is this? Is it bounded, growing or diverging (i.e. the number of mistakes is unbounded)? Formally, we want to ask: how does the regret bound change over time? What is the order of the number of mistakes? Clearly, we can state that the growth of the terms on the RHS is $O(T)$ (the first two terms are $O(T)$, while the last term is constant, so that the dominant complexity term is $O(T)$.), which is neither good nor bad. 
+
+Therefore, to summarize, WMA has a bounded regret, where error just grows linearly over time (on the optimistic side, the error does not explode). Further, as we will see, using any kind of deterministic prediction, we can't really get a no-regret algorithm, but just by adding some randomization, we will cut the number of mistakes in half. Actually, just by changing one single line of the algorithm, we will cut the number of mistakes in half. This brings us to the study of the Randomized Weighted Majority Algorithm (RWMA) in the next section.
+
+\subsection{Randomized Weighted Majority Algorithm (RWMA)}
+
+Now, we introduce the Randomized Weighted majority Algorithm (RWMA), listed as Algorithm \ref{algo:rwma} below. It is known by many different names, such as Exponentiated Weighted Majority, Hedge Algorithm etc. The key difference from WMA is that we create a multinomial distribution using the weights and make the learner prediction via sampling from this distribution (Line 5, 6).
+
+\begin{algorithm}[H]
+\caption{Randomized Weighted Majority Algorithm (RWMA)}
+\label{algo:rwma}
+\begin{algorithmic}[1]
+\STATE $\textbf{w}^{(1)} \leftarrow \{w_n^{(1)}=1\}_{n=1}^N$ \hfill $\triangleright$ Weight initialization
+\STATE $\eta\leq\frac{1}{2}$\hfill $\triangleright$ Penalty rate initialization
+\FOR{$t=1,\;\cdots,\;T$}
+\STATE \textsc{Receive} ($\textbf{x}^{(t)}\in\{-1, 1\}^N$) \hfill $\triangleright$ Receive experts predictions
+\STATE $I\sim$ \textsc{Multinomial}($\textbf{w}^{(t)}/\Phi^{(t)}$), where $\Phi^{(t)}=\sum_{n=1}^Nw_n^{(t)}$
+\STATE $\hat{y}^{(t)}=h_i(\textbf{x}^{(t)})$ \hfill $\triangleright$ Make learner prediction via sampling
+\STATE \textsc{Receive} ($y^{(t)}\in\{-1, 1\}$) \hfill $\triangleright$ Receive actual answer
+\STATE $w_n^{(t+1)}\leftarrow w_n^{(t)}\big(1-\eta\cdot\textbf{1}[y^{(t)}\neq h_n(\textbf{x})^{(t)}]\big)$ \hfill $\triangleright$ Weight update
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+Now, let's derive the mistake bound for RWMA. We will find that the expected number of mistakes for RWMA is upper bounded and the mistake bound is better than a factor of 2, when compared to the WMA. But first, we state a simple lemma to help derive further results in Theorem 9.
+
+
+\lemma{$e^x\geq 1+ x$ for all $x\in\mathbb{R}$.}\label{lemma:2}
+\proof{One can easily show the above inequality by applying Taylor expansion to $e^x$.}
+\theorem{(Mistake bound of RWMA) Let $M^{(t)}, m_i^{(t)}$ respectively be the number of mistakes that have been made by the RWMA learner and the $i$-th hypothesis until the time step $t$, and $N, \eta$ be the number of experts and the penalty rate. Then, expected mistakes of learner $\mathbb{E}[M^{(t)}]$ is upper-bounded as:
+$$\mathbb{E}[M^{(t)}]\leq (1+\eta)m_i^{(t)} + \frac{\log{N}}{\eta}$$}\label{theorm:rwma}
+\proof{Lets again define the potential function $\Phi^{(t)}$ for RWMA as the sum of weights:
+\begin{align}
+  \Phi^{(t)} = \sum_{n=1}^N w_n^{(t)}\label{eq:rwma_potential}
+\end{align}
+By the weight update rule of RWMA, $w_n^{(t+1)}$ can be analytically calculated from $w_n^{(t)}$ as follows:
+\begin{align}
+    w_n^{(t+1)}= \big(1-\eta\cdot\textbf{1}[y^{(t)}\neq y_n^{(t)}]\big)w_n^{(t)}=\big(1-\eta\alpha_n^{(t)}\big)w_n^{(t)}\;\;\;\;\;(\text{where} \;\alpha_n^{(t)}=\textbf{1}[y^{(t)})\neq y_n^{(t)}]\label{eq:rwma_weight}
+\end{align}
+By combining Eq. (\ref{eq:rwma_weight}) \& (\ref{eq:rwma_potential}), one can derive the mathematical relation between $\Phi^{(t+1)}$ and $\Phi^{(t)}$ as follows:
+\begin{align}
+    \Phi^{(t+1)}=\sum_n w_n^{(t+1)}&=\sum_n (1-\eta\alpha_n^{(t)})w_n^{(t)}\;\;\;(\because \text{Eq.}\; (\ref{eq:rwma_weight}))\nonumber\\
+    &=\sum_n w_n^{(t)} - \sum_n \eta\alpha_n^{(t)}w_n^{(t)}\nonumber\\
+    &=\Phi^{(t)} - \frac{\Phi^{(t)}}{\Phi^{(t)}}\sum_n \eta\alpha_n^{(t)}w_n^{(t)}\nonumber\\
+    &=\Phi^{(t)} - \Phi^{(t)}\eta\sum_n \alpha_n^{(t)}\frac{w_n^{(t)}}{\Phi^{(t)}}\nonumber\\
+    &=\Phi^{(t)} - \Phi^{(t)}\eta\sum_n \alpha_n^{(t)}p_n^{(t)}\;\;\;(\text{where}\;p_n^{(t)}=\frac{w_n^{(t)}}{\Phi^{(t)}})\nonumber\\
+    &=\Phi^{(t)}\Big(1-\eta\sum_n\alpha_n^{(t)}p_n^{(t)}\Big)\label{eq:rwma_abc}
+\end{align}
+Assuming all weights are initialized to 1, $\Phi^{(T+1)}$ can be calculated by recursively applying Eq. ({\ref{eq:rwma_abc}}) as follows:
+\begin{align}
+    \Phi^{(T+1)}=\Phi^{(1)}\prod_{t=1}^{T}\Big(1-\eta\sum_n\alpha_n^{(t)}p_n^{(t)}\Big)=N\prod_{t=1}^{T}\Big(1-\eta\sum_n\alpha_n^{(t)}p_n^{(t)}\Big)\label{eq:rwma_xyz}
+\end{align}
+We can now derive the upper bound of $\Phi^{(T+1)}$ by combining Lemma \ref{lemma:2} and Eq. (\ref{eq:rwma_xyz}) as follows:
+\begin{align}
+    \Phi^{(T+1)}&=N\prod_{t=1}^{T}\Big(1-\eta\sum_n\alpha_n^{(t)}p_n^{(t)}\Big)\nonumber\\
+    &\leq N\prod_{t=1}^T\exp{\Big(-\eta\sum_n\alpha_n^{(t)}p_n^{(t)}\Big)}\;\;\;(\because \text{Lemma}\;\ref{lemma:2})\nonumber\\
+    &=N\exp{\Big(-\eta\sum_{t=1}^{T}\mathbb{E}\big[\textbf{1}[y^{(t)}\neq\hat{y}^{(t)}]\big]\Big)}\;\;\;(\because\;\sum_n\alpha_n^{(t)}p_n^{(t)}=\mathbb{E}_p\big[\textbf{1}[y^{(t)}\neq\hat{y}^{(t)}]\big])\nonumber\\
+    &=N\exp{\big(-\mathbb{E}[M^{(T)}]\big)}\;\;\;(\because\;\text{definition of}\;M^{(t)})\label{eq:rwma_upper}
+\end{align}
+By applying the same argument as in WMA, the lower bound of $\Phi^{(T+1)}$ is $(1-\eta)^{m_n^{(T)}}$.
+\begin{align}
+    \Phi^{(T+1)}\geq(1-\eta)^{m_n^{(T)}}\label{eq:rwma_lower}
+\end{align}
+By combining Eq. (\ref{eq:rwma_upper}) \& (\ref{eq:rwma_lower}), we can now derive the mathematical relation between $\mathbb{E}[M^{(t)}]$ and $m_n^{(t)}$ as follows:
+\begin{align}
+    (1-\eta)^{m_n^{(T)}}\leq \Phi^{(T+1)} \leq N\exp{\big(-\mathbb{E}[M^{(T)}]\big)}\label{eq:rwma_init}
+\end{align}
+Finally, we can compute the (upper) bound of expected mistakes $\mathbb{E}[M^{(t)}]$ by combining the bounds of $\Phi^{(t+1)}$ (Eq. (\ref{eq:rwma_init})) and Lemma \ref{lemma:1} as follows:
+\begin{align*}
+    m_n^{(T)}\log(1-\eta) &\leq \log N - \eta\mathbb{E}[M^{(T)}]\\
+    m_n^{(T)}(-\eta-\eta^2)&\leq \log N - \eta\mathbb{E}[M^{(T)}] \;\;\;(\because\; \text{Lemma}\;\ref{lemma:1})\\
+    -m_n^{(T)}(1+\eta)&\leq\frac{\log N}{\eta} - \mathbb{E}[M^{(T)}]\\
+    \mathbb{E}[M^{(T)}]&\leq (1+\eta)m_n^{(T)} + \frac{\log N}{\eta}
+\end{align*}
+Therefore, we have obtained the upper bound of expected regret for RWMA.\QED
+}
+
+We are now interested in the performance (regret bound) of RWMA algorithm.
+\theorem{RWMA is a no-regret algorithm.}
+\proof{By the definition of regret and Theorem \ref{theorm:rwma}}, we could obtain the upper bound of \textit{expected regret} of RWMA, $\mathbb{E}[R]$, as follows:
+\begin{align}
+    \mathbb{E}[R] = \mathbb{E}[M^{(T)}] - m_n^{(T)} \leq \eta m_n^{(T)} + \frac{\log N}{\eta} \label{eq:rwma_final}
+\end{align}
+If we set $\eta$ to $\frac{1}{\sqrt{T}}$, both $\eta m_n^{(T)}$ and $\frac{\log N}{\eta}$ follow $O(\sqrt{T})$.\\
+Thus, $\frac{\mathbb{E}[R]}{T} = \Big(\eta m_n^{(T)} + \frac{\log N}{\eta}\Big) \propto \frac{1}{\sqrt{T}}\rightarrow 0\;\text{as}\;T\rightarrow\infty$.\QED
+
+\subsection{Online Linear Classification}
+
+Now we will start with an Online Linear Classification (OLC) algorithm. Here, we are moving from an exhaustive space to a sampled space, unlike the characterization in Section 1.1. Further, we don't want to program the behavior of the algorithm but learn from an expert, and we will start with two algorithms involving linear hyperplanes to learn the decision boundary:
+\begin{enumerate}
+    \item Perceptron algorithm, which has additive updates.
+    \item Winnow Algorithm, which has multiplicative updates.
+\end{enumerate}
+\begin{algorithm}[H]
+\caption{Perceptron algorithm}
+\label{algo:perceptron}
+\begin{algorithmic}[1]
+\STATE $\textbf{w}^{(1)} \leftarrow 0$ \hfill $\triangleright$ Weight initialization
+\FOR{$t=1,\;\cdots,\;T$}
+\STATE \textsc{Receive} ($\textbf{x}^{(t)}\in R^N$) \hfill $\triangleright$ Receive expert predictions
+\STATE $\hat{y}^{(t)} = \text{sign}\Big(w^{(t)} x^{(t)}\Big)$ \hfill $\triangleright$ Make learner prediction
+\STATE \textsc{Receive} ($y^{(t)}\in\{-1, 1\}$) \hfill $\triangleright$ Receive actual answer
+\STATE $w_n^{(t+1)}\leftarrow w_n^{(t)} + y^{(t)} \cdot x^{(t)} \cdot\textbf{1}[y^{(t)}\neq x_n^{(t)}] $ \hfill $\triangleright$ Weight update
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+In the perceptron algorithm (listed as Algorithm \ref{algo:perceptron} above), if the prediction is correct then no updates are made. Further, we can ask the following questions to characterize the perceptron algorithm:
+
+\begin{enumerate}
+    \item Is the perceptron algorithm fast? Yes. No weight updates are done for correct prediction, while the incorrect prediction update just involves computing a simple dot product and a sum. The prediction itself is just a dot product.
+    \item Is it a Large Margin classifier? No, there is no notion of margin in the algorithm.
+    \item Does it work on non-separable data? No, but when the data is linearly separable, the perceptron algorithm will make a finite number of mistakes.
+\end{enumerate}
+
+Now again we could derive the mistake bound, following the similar 5-step strategy, as we had used with the weighted majority algorithms. We list the Perceptron Mistake Bound:
+
+\begin{align}
+    M \leq \frac{R^{2}}{\gamma^{2}}
+\end{align}
+
+Here, $R = \maximize_{t} \Vert x^{t}\Vert$ is the norm of the obserbvations and $\gamma = \minimize_{t} y_{t} $ is the margin of separability.
+
+Further, Block and Novikoff \cite{novikoff1963convergence} give the mistake bound, but not the regret bound because under the conditions of linear separability, we do not really need to consider regret, as described in Section 1.2.
+
+%\section*{References}
+%Include your references here. Please cite any resources you found useful.	
+%Populate the refs.bib file or list your references manually. Be consistent in formatting!
+{
+\bibliography{refs}
+\bibliographystyle{abbrv}
+}
+
+%\section{Appendix}
+%This section provides any relevant background material that was not covered in the lectures, but was found to be useful for understanding the material. 
+%For example, derivations, theory underlying techniques employed, etc. 
+
+%Additionally, this section can summarizes applications or extensions of these techniques found in the literature. 
+
+\end{document} % Done!
+
+
