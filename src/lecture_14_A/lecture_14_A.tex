@@ -1,0 +1,466 @@
+\documentclass[11pt]{article}
+\usepackage{latexsym}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{epsfig}
+\usepackage[tight]{subfigure}
+\DeclareMathOperator*{\E}{\mathbb{E}}
+
+\usepackage{amsmath}
+
+\DeclareMathOperator*{\minimize}{min}
+\DeclareMathOperator*{\maximize}{max}
+
+\usepackage{algorithm}
+ %on linux you may need to run sudo apt-get install texlive-full to install algorithm.sys
+\usepackage{algorithmic}
+
+\usepackage{verbatim}
+
+\newcommand{\handout}[5]{
+  \noindent
+  \begin{center}
+  \framebox{
+    \vbox{
+      \hbox to 5.78in { {#1} \hfill #2 }
+      \vspace{4mm}
+      \hbox to 5.78in { {\Large \hfill #5  \hfill} }
+      \vspace{2mm}
+      \hbox to 5.78in { {\em #3 \hfill #4} }
+    }
+  }
+  \end{center}
+  \vspace*{4mm}
+}
+
+
+\newcommand{\lecture}[5]{\handout{#1}{#2}{#3}{#4}{#5}}
+\newcommand{\collision}[0]{\mathrm{collision}}
+\newcommand{\nocollision}[0]{\overline{\collision}}
+
+\newcommand*{\QED}{\hfill\ensuremath{\square}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{observation}[theorem]{Observation}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{note}[theorem]{Note}
+
+% 1-inch margins, from fullpage.sty by H.Partl, Version 2, Dec. 15, 1988.
+\topmargin 0pt
+\advance \topmargin by -\headheight
+\advance \topmargin by -\headsep
+\textheight 8.9in
+\oddsidemargin 0pt
+\evensidemargin \oddsidemargin
+\marginparwidth 0.5in
+\textwidth 6.5in
+
+\parindent 0in
+\parskip 1.5ex
+%\renewcommand{\baselinestretch}{1.25}
+
+\begin{document}
+\lecture{Statistical Techniques in Robotics (16-831, S20)}{Lecture \#14
+  (Wednesday, March 24)}{Lecturer: Kris Kitani}{Scribes: Akshay Dharmavaram, Alex Withers}{EXP3 and EXP4}
+
+\section{Review}
+
+\subsection{Thompson Sampling}
+In the last lecture, we learned about the Thompson sampling and the Beta-Bernoulli Bandit algorithms. We will first review the main concept of the multi-arm bandit problem, which is to maximize our payoff by selecting the appropriate arm, conditioned on the observed history. The Thompson Sampling algorithm is a multi-arm bandit problem that falls under the category of Context-free algorithms for stochastic environments. It is also known as the probability matching strategy. In this approach, we aim to balance exploration and exploitation by conditioning our policy to maximize the reward with respect to a set of belief variables. 
+
+In the stochastic environment framework, the rewards are not deterministic, and are approximated as a probability distribution. The Thompson Sampling approach parameterizes this distribution by defining $\theta$, a prior over theta $p(\theta)$, and a reward distribution $r \sim p(r \mid a, \theta)$. Our goal is to maintain a running estimate of the prior based on the observed history. We select the arm based on the following:
+
+\begin{align}
+a =\underset{k}{\operatorname{argmax}} \mathbb{E}_{p\left(r \mid a_{k}, \theta *_{k}\right)}\left[r \mid a_{k}, \theta *_{k}\right]
+\end{align}
+
+As the prior is something that needs to be learned, we compute it based using the observed history and take the argmax to obtain the posterior distribution of $\theta$ as:
+
+\begin{align}
+p\left(\theta \mid h^{(t)}\right) &=p\left(\theta \mid a^{(1)}, r^{(1)}, \ldots, a^{(t)}, r^{(t)}\right) \\ 
+\hat{\theta} &=\underset{\theta}{\operatorname{argmax}} \text{ } p\left(\theta \mid h^{(t)}\right)
+\end{align}
+
+As it is non-trivial to model the distribution without any further constraints, we impose the Markov assumption and use the Bayes' Rule to simplify the equations, as follows.
+
+\begin{align}
+p\left(\theta \mid a^{(1)}, r^{(1)}, \ldots, a^{(t)}, r^{(t)}\right) &=\frac{p\left(a^{(1)}, r^{(1)}, \ldots, a^{(t)}, r^{(t)} \mid \theta\right) p(\theta)}{p\left(a^{(1)}, r^{(1)}, \ldots, a^{(t)}, r^{(t)}\right)} \\
+p\left(a^{(1)}, r^{(1)}, \ldots, a^{(t)}, r^{(t)} \mid \theta\right) &\rightarrow p\left(r^{(t)} \mid a^{(t)}, \theta\right) p\left(a^{(t)}\right) \ldots p\left(r^{(t)} \mid a^{(t)}, \theta\right) p\left(a^{(1)}\right)
+\end{align}
+
+We substitute these equations into the equations 2 and 3, to obtain the following:
+
+\begin{align}
+p\left(\theta \mid h^{(t)}\right) &=\frac{p\left(h^{(t)} p(\theta)\right.}{p\left(h^{(t)}\right)} \propto \prod_{t} p\left(r^{(t)} \mid a^{(t)}, \theta\right) p(\theta) \\
+\hat{\theta} &=\underset{\theta_{k}}{\operatorname{argmax}} \text{ } p\left(r^{(t)} \mid a_{k}^{(t)}, \theta_{k}\right) p\left(\theta_{k} \mid h_{k}^{(t-1)}\right)
+\end{align}
+%This section serves as a review of the previous lecture and any other context required to frame the content of the current lecture. 
+
+%You may format the scribes in any way you like, aside from changing font style, size and page format. Please use subsections and paragraphs to increase the readability of your notes.
+
+%Length requirement 1-2 pages.
+
+\subsection{Parameterization using Beta and Bernoulli distributions}
+
+We parametrize our prior and posterior distributions to obtain efficient updates, or updates that would require minimal further computation. Thus, we choose conjugate distributions as our prior and posterior approximations due to their special property of conjugation. Conjugate distributions or conjugate pairs refer to a pair of posterior distributions and prior distributions for which the resulting posterior distribution belongs into the same parametric family of distributions of the prior distribution. Due to reflexivity, the prior distribution is also a conjugate prior for this sampling distribution.
+
+It is known that Beta and Bernoulli distributions are conjugate pairs, as defined below:
+
+The Bernoulli distribution is defined as
+\begin{align}
+p(r \mid \theta)=\theta^{r}(1-\theta)^{1-r}
+\end{align}
+
+The Beta distribution is defined as:
+\begin{align}
+p(\theta) &=\frac{\Gamma(\alpha+\beta)}{\Gamma(\alpha) \Gamma(\beta)} \theta^{(\alpha-1)}(1-\theta)^{\beta-1} \\
+\Gamma(n) &=(n-1) !
+\end{align}
+
+We can reduce the posterior as follows:
+
+\begin{align}
+p(r \mid \theta)&=\theta^{r}(1-\theta)^{1-r} \\
+p(\theta)&=\frac{\Gamma(\alpha+\beta)}{\Gamma(\alpha) \Gamma(\beta)} \theta^{(\alpha-1)}(1-\theta)^{\beta-1} \\ \\
+p\left(\theta \mid h^{(t)}\right) & \propto p(r \mid a, \theta) p\left(\theta \mid h^{(t-1)}\right) \\
+& \propto \theta^{r}(1-\theta)^{(1-r)} \theta^{\alpha-1}(1-\theta)^{(\beta-1)} \\
+& \propto \theta^{r+\alpha-1}(1-\theta)^{1-r+\beta-1} \\
+& \propto \theta^{(r+\alpha)-1}(1-\theta)^{(1-r+\beta)-1} \\
+& \propto \theta^{\alpha^{\prime}-1}(1-\theta)^{\beta^{\prime}-1}
+\end{align}
+
+Finally, the posterior updates can be defined as follows:
+
+\begin{align}
+\beta^{\prime}=\beta+1-r \\
+\alpha^{\prime}=\alpha+r
+\end{align}
+
+\subsection{Thompson Sampling \& Bernoulli-Beta Thompson Sampling}
+Putting everything to gether, we can define the Thompson Sampling \& Bernoulli-Beta Thompson Sampling algorithms. We also present their regret bound, $BR(T)=O(\sqrt{K T \log T})$.
+
+\begin{algorithm}[H]
+\caption{Thompson Sampling Pseudo-Code}
+\label{algo:thomp}
+\begin{algorithmic}[1]
+\FOR{$t=1,\;\cdots,\;T$}
+\STATE $\theta_{k} \sim p\left(\theta_{k} \mid h_{k}^{\left(t^{\prime}\right)}\right)$ $\forall k$
+\STATE $a_{\hat{k}}^{(t)}=\operatorname{argmax}_{k} \mathbb{E}_{p\left(r \mid a_{k}, \theta_{k}\right)}\left[r \mid a_{k}, \theta_{k}\right]$
+\STATE \textsc{Receive} ($r^{(t)}\in\{0, 1\}$)
+\STATE $h_{\hat{k}}^{\left(t^{\prime}+1\right)}=h_{\hat{k}}^{\left(t^{\prime}\right)}\left(r^{(t)}, a_{\hat{k}}^{(t)}\right)$
+\STATE $p\left(\theta_{\hat{k}} \mid h_{\hat{k}}^{\left(t^{\prime}+1\right)}\right) \propto p\left(h_{\hat{k}}^{\left(t^{\prime}\right)} \mid \theta_{\hat{k}}\right) p\left(\theta_{\hat{k}} \mid h_{\hat{k}}^{\left(t^{\prime}\right)}\right)$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Bernoulli-Beta Thompson Sampling Pseudo-Code}
+\label{algo:BBthomp}
+\begin{algorithmic}[1]
+\FOR{$t=1,\;\cdots,\;T$}
+\STATE $\theta_{k} \sim p\left(\theta \mid \alpha_{k}, \beta_{k}\right)$ $\forall k$
+\STATE $a_{\hat{k}}^{(t)}=\operatorname{argmax}_{k} \mathbb{E}_{p\left(r \mid a_{k}, \theta_{k}\right)}\left[r \mid a_{k}, \theta_{k}\right]$
+\STATE \textsc{Receive} ($r^{(t)}\in\{0, 1\}$)
+\STATE $\alpha_{\hat{k}}=\alpha_{\hat{k}}+r^{(t)}$
+\STATE $\beta_{\hat{k}}=\beta_{\hat{k}}+1-r^{(t)}$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+\section{Summary}
+\subsection{Adversarial Environments}
+In the previous sections, we have discussed two context-free, multi-arm bandit algorithms for stochastic environments. Now, we will move on to the adversarial environments, and discuss one context-free algorithm and one contextual bandit algorithm. 
+
+The adversarial bandit environment is defined as an arbitrary series of reward vectors that precisely define the outcome of the arms at any given time-step. An intuitive way to comprehend this is by visualizing a matrix, where the rows correspond to the arm rewards and the columns correspond to the reward values for a given time-step. Thus, to obtain the reward for an arm at a given time-step, we would need to retrieve the reward value in the matrix corresponding to the appropriate arm and time-step. The reason such a type of environment is termed as adversarial, is because the worst case scenario for the arbitrarily defined sequence of reward vectors, could be the adversarial case for a given algorithm.
+
+The adversarial case is comparatively arbitrary, when compared to the stochastic environment. In the stochastic environment, we assume that there is a certain underlying phenomenon describing the rewards. However, in the adversarial case, we assume that the worst case scenario is that the environment is adversarial with respect to our chosen algorithm. This is not uncommon, as many phenomena in nature are too complex to model, thereby seeming arbitrary. Thus, we would need to engineer reactionary algorithms that learn to pull the best possible arm, when considering the history in hindsight.
+
+Thus, the goal for an ideal multi-arm bandit algorithm, for an adversarial environment, will be to minimize the regret, regardless of the reward sequence. 
+
+\subsection{Hedge Algorithm}
+The hedge algorithm is a PWEA algorithm that approximates a weight distribution that conditionally defines a policy. The pseudo-code is written as follows.
+
+\begin{algorithm}[H]
+\caption{Hedge Algorithm}
+\label{algo:Hedge}
+\begin{algorithmic}[1]
+\STATE $\textbf{w}^{(1)} \leftarrow \{w_k^{(1)}=1\}_{k=1}^K$ \hfill $\triangleright$ Weight initialization
+\FOR{$t=1,\;\cdots,\;T$}
+\STATE \textsc{Receive} ($x^{(t)}\in\{-1, 1\}$) \hfill $\triangleright$ Receive reward
+\STATE $\textbf{p}^{(t)}=\frac{\textbf{w}^{(t)}}{\sum_kw_k^{(t)}}$ \hfill $\triangleright$ probability over actions
+\STATE $k \sim$\textsc{Multinomial} ($\textbf{p}^{(t)}$) \hfill $\triangleright$ randomly choose action
+\STATE $\hat{y}^{(t)} = h_k(x^{(t)})$ \hfill $\triangleright$ take action
+\STATE \textsc{Receive} ($r^{(t)}\in\{-1, 1\}$) \hfill $\triangleright$ Receive reward
+\STATE $w_k^{(t+1)} = w_k^{(t)} \exp \left(-\beta \left( \mathbf{1}\left[y^{(t)} \neq h_{n}\left(x^{(t)}\right)\right] \right) \right)$ \hfill $\triangleright$ Weight update
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+\subsection{Estimators}
+\subsubsection{Biased Estimator}
+An estimator $\hat{X}$ of a variable $X$ is unbiased if:
+\begin{align}
+  E\left[\hat{X}\right] = X
+\end{align}
+
+We will define a hypothetical custom reward estimator as follows:
+\begin{align}
+  c_{i}^{(t)}\left(a^{(t)}\right)=\mathbf{1}\left[a^{(t)}=i\right] \cdot r^{(t)}
+\end{align}
+
+Using the definition for an unbiased estimator, we plug in our estimator, for the single arm case, into the definition.
+
+\begin{align}
+\mathbb{E}_{p(a)}\left[c_{1}^{(t)}\left(a^{(t)}\right)\right] &=p\left(a^{(t)}=1\right) \cdot \mathbf{1}\left[a^{(t)}=1\right] \cdot r^{(t)} \\
+&=r^{(t)}
+\end{align}
+
+We also notice that over $T$ time-steps, the expectation of our estimator is:
+\begin{align}
+\mathbb{E}_{p(a)}\left[\frac{1}{T} \sum_{t=1}^{T} c_{1}^{(t)}\left(a^{(t)}\right)\right]=\frac{1}{T} \sum_{t=1}^{T} r^{(t)}
+&=r^{(t)}
+\end{align}
+We notice that for a single arm, our estimator is indeed unbiased.
+
+Now, we will show that for the multi-arm case, that the estimator is biased. We will show the counter example for the two-arm case here. We follow the same procedure as shown above.
+
+\begin{align}
+ \mathbb{E}_{p(a)}\left[c_{1}^{(t)}\left(a^{(t)}\right)\right] &=p\left(a^{(t)}=1\right) \cdot c_{1}^{(t)}(1)+p\left(a^{(t)}=2\right) \cdot c_{1}^{(t)}(2) \\ &=p\left(a^{(t)}=1\right) \mathbf{1}\left[a^{(t)}=1\right] \cdot r^{(t)}+p\left(a^{(t)}=2\right) \mathbf{1}\left[a^{(t)}=1\right] \cdot r^{(t)} \\ &=(0.5) \cdot 1 \cdot r^{(t)}+(0.5) \cdot 0 \cdot r^{(t)} \\
+ &=(0.5) \cdot r^{(t)}
+\end{align}
+We can also see that for the accumulating reward condition, we get:
+
+\begin{align}
+    \mathbb{E}_{p(a)}\left[\frac{1}{T} \sum_{t=1}^{T} c_{1}^{(t)}\left(a^{(t)}\right)\right]=\frac{1}{T} \sum_{t=1}^{T}(0.5) r^{(t)}
+\end{align}
+Thus, we show that the estimator is biased.
+
+\subsubsection{Unbiased Estimator}
+For our frameworks, we will define a custom unbiased reward estimator as follows:
+\begin{align}
+  c_{i}^{(t)}\left(a^{(t)}\right)=\mathbf{1}\left[a^{(t)}=i\right] \cdot r^{(t)} \cdot \frac{1}{p_i}
+\end{align}
+
+Now, we will show that for the multi-arm case, that the estimator is unbiased. We will show the proof for the two-arm case here, which can be easily extended to the multi-arm case. We follow the same procedure as shown above.
+
+\begin{align} \mathbb{E}_{p(a)}\left[c_{1}^{(t)}\left(a^{(t)}\right)\right] &=p\left(a^{(t)}=1\right) \cdot c_{1}^{(t)}(1)+p\left(a^{(t)}=2\right) \cdot c_{1}^{(t)}(2) \\ &=p\left(a^{(t)}=1\right) \mathbf{1}\left[a^{(t)}=1\right] \cdot r^{(t)} \cdot \frac{1}{p_{1}}+p\left(a^{(t)}=2\right) \mathbf{1}\left[a^{(t)}=1\right] \cdot r^{(t)} \cdot \frac{1}{p_{1}} \\ &=(0.5) \cdot 1 \cdot r^{(t)} \cdot \frac{1}{0.5}+(0.5) \cdot 0 \cdot r^{(t)} \cdot \frac{1}{0.5} \\ &=r^{(t)}
+\end{align}
+Thus, we show that the estimator is unbiased.
+
+\subsection{EXP3}
+\normalfont
+The EXP3 algorithm is listed as Algorithm \ref{algo:EXP3} below. The update equation on line 7 states that a weight is updated every time, and will weight this action, k, more heavily if the reward is large, or if the probability of being picked was low and gave a moderate reward. By dividing the reward by the probability of being picked, one uses an unbiased estimator to update the weight. Unbiased estimators are explained in section 2.3.2.
+
+\begin{algorithm}[H]
+\caption{EXP3}
+\label{algo:EXP3}
+\begin{algorithmic}[1]
+\STATE $\textbf{w}^{(1)} \leftarrow \{w_k^{(1)}=1\}_{k=1}^K$ \hfill $\triangleright$ Weight initialization
+\FOR{$t=1,\;\cdots,\;T$}
+\STATE $\textbf{p}^{(t)}=(1-\gamma)\frac{\textbf{w}^{(t)}}{\sum_kw_k^{(t)}}+\frac{\gamma}{K}$ \hfill $\triangleright$ probability over actions
+\STATE $k \sim$\textsc{Multinomial} ($\textbf{p}^{(t)}$) \hfill $\triangleright$ randomly choose action
+\STATE $a^{(t)} = a_k$ \hfill $\triangleright$ take action
+\STATE \textsc{Receive} ($r^{(t)}\in\{0, 1\}$) \hfill $\triangleright$ Receive reward
+\STATE $w_k^{(t+1)} = w_k^{(t)}$exp$\big(\frac{\gamma}{K}*\frac{r^{(t)}}{p_k^{(t)}}\big)$ \hfill $\triangleright$ Weight update
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+
+Moving ahead, the key question is that if EXP3 is in an adversarial environment, can the learner have no regret? The adversary can know the probability of pulling each arm and the reward that arm gives, however the adversary will not know which arm the learner is choosing to pull. The same strategy that has been used in earlier classes will be used here to define an upper regret bound for the EXP3 algorithm. First, define the potential function, then define the upper and lower bounds of that potential function, combine the bounds and do some algebra to discover the regret bound. 
+
+This algorithm looks very similar to the hedge algorithm (\ref{algo:Hedge}) that has been covered in previous lectures. One key difference is that EXP3 has partially observed rewards of the results, leading to only knowing one gain/loss for one arm and only updating one weight, as opposed to hedge's fully observed rewards. To analyse this algorithm we will convert the partially observed gain function into a fully observed gain function using an unbiased estimate, and turn the existing problem into a prediction problem with no expert advice. Starting with a partially observed gain function where only the reward from the kth arm is known, one can represent the gain function as a fully observed gain function by dividing the reward by the probability that the arm was picked. The resulting gain function is all zeros except for the kth arm where there is an unbiased estimate of the reward, $\frac{r^{(t)}}{p_k^{(t)}}$. 
+
+By doing this conversion, the regret bound can be analyzed as a expert advice problem without experts. This changes the weight update in Algorithm \ref{algo:EXP3} to $w_k^{(t+1)}=w_k^{(t)}$exp$(\frac{\gamma}{K}*g_k^{(t)}) \forall k$. This works because when the gain is 0, the weight will stay the same, but when there is a reward the weight will update. Lastly the probability of each action in Algorithm \ref{algo:EXP3} will also change, to $\textbf{p}^{(t)}=\frac{\textbf{w}^{(t)}}{\sum_kw_k^{(t)}}$. These changes are vitally important and should be remembered going forward.
+
+\subsubsection{Potential Function}
+\proof{Lets define the potential function $\Phi^{(t)}$ for EXP3 as follows:
+\begin{align}
+  \Phi^{(t)} = \sum_{t=1}^T \log \big(\frac{z^{(t+1)}}{z^{(t)}}\big)  
+\end{align}
+where, $z^{(t)}$ is the sum of the weights for time step $t$.
+}
+\subsubsection{Upper Bound}
+\theorem{(Upper bound of EXP3) This potential function can be upper and lower bounded over time, eventually the lower and upper bounds will have terms that combine to form the definition of regret, and the regret bound is built from there. For now the upper bound must be calculated.}
+
+\begin{align}
+  \Phi^{(t)} = \sum_{t=1}^T \log \big(\frac{z^{(t+1)}}{z^{(t)}}\big)  
+\end{align}
+Starting from the potential function we replace z with its definition
+\begin{align}
+  \Phi^{(t)} = \sum_{t=1}^T \log \big(\frac{\sum_kw_k^{(t+1)}}{\sum_kw_k^{(t)}}\big)  
+\end{align}
+Then insert the update equation, line 8 of algorithm \ref{algo:EXP3} for $w_k^{(t+1)}$
+\begin{align}
+  \Phi^{(t)} = \sum_{t=1}^T \log \big(\frac{\sum_kw_k^{(t)}*\exp(\frac{\gamma}{K}*g_k^{(t)}}{\sum_kw_k^{(t)}})\big)  
+\end{align}
+Assume a single sequence is known.
+\begin{align}
+  \Phi^{(t)} = \sum_{t=1}^T \log \big(\sum_k\frac{w_k^{(t)}}{\sum_kw_k^{(t)}}*\exp(\frac{\gamma}{K}*g_k^{(t)})\big)  
+\end{align}
+Replace $\frac{w_k^{(t)}}{\sum_kw_k^{(t)}}$ with the probability of selection of that arm, line 3 of algorithm \ref{algo:EXP3}.
+\begin{align}
+  \Phi^{(t)} = \sum_{t=1}^T \log \big(\sum_k\frac{p_k^{(t)}-\frac{\gamma}{K}}{1-\gamma}*\exp(\frac{\gamma}{K}*g_k^{(t)})\big)  
+\end{align}
+Use a known inequality of $e^x\leq1+x+x^2$ to bound the function.
+\begin{align}
+  \Phi^{(t)} \leq \sum_{t=1}^T \log \big(\sum_k\frac{p_k^{(t)}-\frac{\gamma}{K}}{1-\gamma}*(1+\frac{\gamma}{K}*g_k^{(t)}+(\frac{\gamma}{K}*g_k^{(t)})^2)\big)  
+\end{align}
+Multiplying through
+\begin{align}
+  \Phi^{(t)} \leq \sum_{t=1}^T \log \big(\sum_k\frac{p_k^{(t)}-\frac{\gamma}{K}}{1-\gamma}+\sum_k\frac{p_k^{(t)}-\frac{\gamma}{K}}{1-\gamma}\frac{\gamma}{K}*g_k^{(t)}+\sum_k\frac{p_k^{(t)}-\frac{\gamma}{K}}{1-\gamma}(\frac{\gamma}{K}*g_k^{(t)})^2\big)\\
+  \Phi^{(t)} \leq \sum_{t=1}^T \log \big(1+\frac{\gamma}{K(1-\gamma)}\sum_k p_k^{(t)}*g_k^{(t)}+\frac{\gamma^2}{K^2(1-\gamma)}\sum_k p_k^{(t)}*g_k^{(t)}^2\big)
+\end{align}
+Then bounding with a known equality $\ln(1+x)\leq x$, we get the final upper bound.\\
+$\Phi$ is upper-bounded as:
+$$\Phi\leq \sum_t\big(\frac{\gamma}{K(1-\gamma)}\sum_kp_k^{(t)}*g_k^{(t)}+\frac{\gamma^2}{K^2(1-\gamma)}\sum_kp_k^{(t)}*g_k^{(t)}^2\big)$$\label{theorem:upperEXP3}
+Therefore, we have obtained the upper bound of the potential function.
+
+\subsubsection{Lower Bound}
+\theorem{(Lower bound of EXP3) With the upper bound calculated, all that is needed is the lower bound to calculate the regret bound. Starting from the potential function, one needs to telescope the series. 
+
+\begin{align}
+  \Phi^{(t)} = \sum_{t=1}^T \log \big(\frac{z^{(t+1)}}{z^{(t)}}\big)  
+\end{align}
+To telescope a series means to $\sum(x_{n+1}-x_n) = x_N-x_1$ thus moving the series of subtractions to the outer most extremes. In this case it would look like this.
+\begin{align}
+  \Phi^{(t)} = \log \big(\frac{\sum_kw_k^{(T)}}{\sum_kw_k^{(1)}}\big)  
+\end{align}
+Then from line 2 of Algorithm \ref{algo:EXP3}, we know that each weight at time step 1 is 1, so:
+\begin{align}
+  \Phi^{(t)} = \log \big(\frac{\sum_kw_k^{(T)}}{K}\big)  
+\end{align}
+Separate the logs and apply the update equation from line 8 of algorithm \ref{algo:EXP3}.
+\begin{align}
+  \Phi^{(t)} = -\log(K) + \log(\sum_kw_k^{(T)}\exp(\frac{\gamma}{K}*g_k^{(t)})
+\end{align}
+Recursively apply the update equation from line 8 of algorithm \ref{algo:EXP3}.
+\begin{align}
+  \Phi^{(t)} = -\log(K) + \log(\sum_{k=1}^K\prod_{t=1}^T \exp(\frac{\gamma}{K}*g_k^{(t)})  
+\end{align}
+Then one can switch the product term into a sum by pushing it into the exponent
+\begin{align}
+  \Phi^{(t)} = -\log(K) + \log(\sum_{k=1}^K \exp(\frac{\gamma}{K}\sum_{t=1}^Tg_k^{(t)})  
+\end{align}
+Any element lower bounds a sum
+\begin{align}
+  \Phi^{(t)} \geq -\log(K) + \log(\exp(\frac{\gamma}{K}\sum_{t=1}^Tg_k^{(t)})  \forall k
+\end{align}
+Algebra gets the equation into the final lower bound.
+
+$$\Phi^{(t)}\geq -\log(K) + \frac{\gamma}{K}\sum_{t=1}^Tg_k^{(t)}  \forall k$$\label{theorem:lowerEXP3}
+\label{theorem:lowerEXP3}
+}
+\subsubsection{Combine Bounds}
+Finally, the lower and upper bounds can be combined to discover the regret bound.
+
+\begin{align}
+  -\log(K) + \frac{\gamma}{K}\sum_{t=1}^T g_k^{(t)} \leq \sum_t\big(\frac{\gamma}{K(1-\gamma)}\sum_k p_k^{(t)}*g_k^{(t)}+\frac{\gamma^2}{K^2(1-\gamma)}\sum_k p_k^{(t)}*g_k^{(t)}^2\big)
+\end{align}
+
+Then by rearranging terms and dividing each side by $\frac{\gamma}{K}$ 
+\begin{align}
+  \sum_{t=1}^T g_k^{(t)} - \frac{1}{1-\gamma}\sum_t\sum_k p_k^{(t)}*g_k^{(t)} \leq \frac{K}{\gamma}\log(K) +
+  \frac{\gamma}{K(1-\gamma)}\sum_t\sum_k p_k^{(t)}*g_k^{(t)}^2
+\end{align}
+Rearrange more terms 
+\begin{align}
+  (1-\gamma)\sum_{t=1}^T g_k^{(t)} - \sum_t\sum_k p_k^{(t)}*g_k^{(t)} \leq 
+  \frac{K}{\gamma}\log(K) + \frac{\gamma}{K}\sum_t\sum_k p_k^{(t)}*g_k^{(t)}^2\\
+  \sum_{t=1}^T g_k^{(t)} - \sum_t\sum_k p_k^{(t)}*g_k^{(t)} \leq 
+  \frac{K}{\gamma}\log(K) + \frac{\gamma}{K}\sum_t\sum_kg_k^{(t)}+\gamma\sum_{t=1}^T g_j^{(t)}
+\end{align}
+Take the expectation of both sides
+\begin{align}
+  \E_p[\sum_{t=1}^T g_k^{(t)}] - \E_p[\sum_t\sum_k p_k^{(t)}*g_k^{(t)}] \leq 
+  \frac{K}{\gamma}\log(K) + \frac{\gamma}{K}\sum_t\sum_k\E_p[g_k^{(t)}]+\gamma\sum_{t=1}^T\E_p[g_j^{(t)}]
+\end{align}
+Simplify expectations into other known terms
+\begin{align}
+  \sum_{t=1}^T r_j^{(t)} - \E_p[\sum_t\sum_k p_k^{(t)}*g_k^{(t)}] \leq 
+  \frac{K}{\gamma}\log(K) + \frac{\gamma}{K}\sum_t\sum_k\E_p[r_k^{(t)}]+\gamma\sum_{t=1}^T\E_p[r_j^{(t)}]
+\end{align}
+Replace rewards with gains
+\begin{align}
+  G_{max} - \E_p[\sum_t\sum_k p_k^{(t)}*g_k^{(t)}] \leq 
+  \frac{K}{\gamma}\log(K) + \frac{\gamma}{K}K(G_{max})+\gamma G_{max}
+\end{align}
+Simplify
+\begin{align}
+  G_{max} - \E_p[\sum_t\sum_k p_k^{(t)}*g_k^{(t)}] \leq 
+  \frac{K}{\gamma}\log(K) + 2\gamma G_{max}
+\end{align}
+The left term is equivalent to the expected regret of the function, and the right side can be further reduced by finding an optimal value for $\gamma$. This can be done by taking the derivative of the right side and solving for $\gamma$.
+
+\begin{align}\label{lemma:optimizegamma}
+    \frac{d}{d\gamma}(\frac{K}{\gamma}\logK+2\gamma T) = 0\\
+    -\frac{K\log K}{\gamma^2}+2T = 0\\
+    \frac{K\log K}{\gamma^2}=2T\\
+    \frac{K\log K}{2T}=\gamma^2\\
+    \sqrt{\frac{K\log K}{2T}}=\gamma
+\end{align}
+
+Then by plugging in this $\gamma$ one can simplify the result to get a nice expected regret bound.
+
+\begin{align}
+    \E[R^{(T)}\leq \frac{K\log K}{\gamma}+2\gamma T\\
+    \E[R^{(T)}\leq \frac{K\log K}{\sqrt{\frac{K\log K}{2T}}}+2\sqrt{\frac{K\log K}{2T}} T\\
+    \E[R^{(T)}\leq \sqrt{2T K\log K}+\sqrt{2T K\log K}\\
+    \E[R^{(T)}\leq 2\sqrt{2T K\log K}\\
+    \E[R^{(T)}\leq O(\sqrt{T K\log K})\label{eq:exp3regretbound}\\
+\end{align}
+Thus the regret is bounded by T and K. This means that EXP3 is a no regret algorithm! This regret algorithm is dependent on a non-stochastic environment, or even an adversarial environment, and is compared to the best performing arm. If the environment was stochastic, then the upper bound would be smaller, and the solve would be different due to making different assumptions. 
+
+\subsection{EXP4}
+The EXP3 algorithm is named as such because of the three behaviors that define this algorithm, exploitation, exploration, and exponential-weight updating. EXP4, the next algorithm learned in this class, adds one more exp, expert advice. The algorithm is similar in most ways and uses the context of experts to make better decisions. In this way, the algorithm has a slightly smaller upper regret bound.
+
+\begin{algorithm}[H]
+\caption{EXP4}
+\label{algo:EXP4}
+\begin{algorithmic}[1]
+\STATE $\textbf{w}^{(1)} \leftarrow \{w_n^{(1)}=1\}_{n=1}^N$ \hfill $\triangleright$ Weight initialization
+\FOR{$t=1,\;\cdots,\;T$}
+\STATE \textsc{Receive}$\textbf{X}^{(t)}\in \mathbb{R}^N$ \hfill $\triangleright$ advice from experts
+\STATE $\textbf{p}^{(t)}=(1-\gamma)\frac{\textbf{w}^{(t)}}{\norm{w_k^{(t)}}}*\textbf{X}^{(t)}\in \Delta^K$ \hfill $\triangleright$ probability over actions
+\STATE $k \sim$\textsc{Multinomial} ($\textbf{p}^{(t)}$) \hfill $\triangleright$ randomly choose action
+\STATE \textsc{Receive} ($r^{(t)}$) \hfill $\triangleright$ Receive reward
+\STATE \hat{\textbf{r}}^{(t)} = \frac{r^{(t)}}{q_k^{(t)}\mathbb{I}[k=k^{(t)}]\in \mathbb{I}^K} \hfill $\triangleright$ reward over all terms
+\STATE \textbf{g}^{(t)}=\textbf{X}^{(t)}*\hat{\textbf{r}}^{(t)}\in \mathbb{R}^N   \hfill $\triangleright$ Per expert reward
+\STATE $w_k^{(t+1)} = w_k^{(t)}\exp(\gamma*g_n^{(t)})  \forall n$ \hfill $\triangleright$ Weight update
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+There are some key differences between EXP4 and EXP3. EXP4 relies on expert advice to inform the weights, as shown on line 5 of EXP4 in comparison to EXP3's line 4. Then the expert advice also informs the rewards that update the weights, lines 10 and 7 for comparison. These differences do not vary the derivation of the regret bound enough to warrant re-deriving it. What ends up changing is that the regret of EXP4 is as follows.
+\begin{align}
+    R_{EXP4}\leq \sqrt{KT\log N}\label{eq:EXP4regretbound}
+\end{align}
+This is true where K is the number of arms, T is the total number of update steps, and N is the number of experts. This algorithm can make a difference over EXP3 when there is a very large number of arms, and a limited number of experts that can inform the learner on each arm, otherwise EXP3 and EXP4 perform similarly.
+
+%\section*{References}
+%Include your references here. Please cite any resources you found useful.	
+%Populate the refs.bib file or list your references manually. Be consistent in formatting!
+{
+\begin{thebibliography}{9}
+\bibitem{EXP3} 
+Kitani, Kris. “Bandit: EXP3.” Statistical Techniques in Robotics. Statistical Techniques in Robotics, 24 Mar. 2021, Pittsburgh, PA. www.dropbox.com/sh/ot8ijbxfr9ngol2/AAAruOFyQu3T6582fWm1Aumja?dl=0&preview=L14 EXP3-EXP4-Review.pdf.
+
+\bibitem{thomsonsampling} 
+Kitani, Kris. “Thompson Sampling” Statistical Techniques in Robotics. Statistical Techniques in Robotics, 17 Mar. 2021, Pittsburgh, PA. https://www.dropbox.com/sh/ot8ijbxfr9ngol2/AAAruOFyQu3T6582fWm1Aumja?dl=0&preview=L13+MAB-Thompsons+Sampling.pdf
+\end{thebibliography}
+}
+
+%\section{Appendix}
+%This section provides any relevant background material that was not covered in the lectures, but was found to be useful for understanding the material. 
+%For example, derivations, theory underlying techniques employed, etc. 
+
+%Additionally, this section can summarizes applications or extensions of these techniques found in the literature. 
+
+\end{document} % Done!
+
+
