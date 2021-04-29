@@ -1,0 +1,354 @@
+\documentclass[11pt]{article}
+\usepackage{latexsym}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{epsfig}
+\usepackage[tight]{subfigure}
+
+\usepackage{amsmath}
+
+\DeclareMathOperator*{\minimize}{min}
+\DeclareMathOperator*{\maximize}{max}
+
+\usepackage{algorithm}
+ %on linux you may need to run sudo apt-get install texlive-full to install algorithm.sys
+\usepackage{algorithmic}
+
+\usepackage{verbatim}
+
+\newcommand{\handout}[5]{
+  \noindent
+  \begin{center}
+  \framebox{
+    \vbox{
+      \hbox to 5.78in { {#1} \hfill #2 }
+      \vspace{4mm}
+      \hbox to 5.78in { {\Large \hfill #5  \hfill} }
+      \vspace{2mm}
+      \hbox to 5.78in { {\em #3 \hfill #4} }
+    }
+  }
+  \end{center}
+  \vspace*{4mm}
+}
+
+\newcommand{\lecture}[5]{\handout{#1}{#2}{#3}{#4}{#5}}
+\newcommand{\collision}[0]{\mathrm{collision}}
+\newcommand{\nocollision}[0]{\overline{\collision}}
+
+\newcommand*{\QED}{\hfill\ensuremath{\square}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{observation}[theorem]{Observation}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{note}[theorem]{Note}
+
+% 1-inch margins, from fullpage.sty by H.Partl, Version 2, Dec. 15, 1988.
+\topmargin 0pt
+\advance \topmargin by -\headheight
+\advance \topmargin by -\headsep
+\textheight 8.9in
+\oddsidemargin 0pt
+\evensidemargin \oddsidemargin
+\marginparwidth 0.5in
+\textwidth 6.5in
+
+\parindent 0in
+\parskip 1.5ex
+%\renewcommand{\baselinestretch}{1.25}
+
+\begin{document}
+
+\lecture{Statistical Techniques in Robotics (16-831, S21)}{Lecture \#22
+  (Monday, April 26)}{Lecturer: Kris Kitani}{Scribes: Zihang Lai}{Imitation Learning \& LP-IRL}
+
+\section{Review}
+In the last lectures, on the topic of Reinforcement Learning (RL), we had analyzed three main types of Reinforcement Learning algorithms: (1) Policy-based, (2) Value-based, and (3) Hybrid. We discussed some key algorithms for each type of algorithms, including Policy Iteration, Value Iteration, TD Learning, Policy Gradient, Actor-Critic methods and so on. In this lecture, we will move to a different topic of Imitation Learning. We will discuss the high level idea of Imitation Learning and a specific type of IL algorithm called Inverse Reinforcement Learning (IRL). For a quick high level takeaway, we note that RL requires a predefined reward function, which could be hard to set by hand. For instance, it might be complex to define a reward function for a robotic arm that aims to grasp things. Should the controlling policy gets penalised if a specific torque is applied? Or when the arm rotates away from the object that it aims to grasp? It could be easier to just show examples. We also note that because RL algorithms learn from interacting with the environment, they could take a long time to learn if the state space is too large. 
+
+This lecture, after the review section, will discuss an approach to address these issues: Imitation Learning, and specifically, the Inverse Reinforcement Learning algorithm. In the next two subsections, we first recap the Reinforcement Learning algorithms and then motivates Imitation Learning.
+
+%This section serves as a review of the previous lecture and any other context required to frame the content of the current lecture. 
+
+%You may format the scribes in any way you like, aside from changing font style, size and page format. Please use subsections and paragraphs to increase the readability of your notes.
+
+%Length requirement 1-2 pages.
+        
+\subsection{Reinforcement Learning}
+\subsubsection{Problem set-up}
+The Reinforcement Learning algorithms are used to solve the optimal policy for a Markov Decision Process. The Markov Decision Process (MDP) is defined by a tuple $(S, A, P, r, H, \rho)$, where $S$ is the state space, $A$ is the action space, $P$ is the transition dynamics where $P(s'|s,a)$ is the probability of reaching state $s'$ from state $s$ when action $a$ is taken; $r$ is the reward function, $H$ is the planning horizon, and $\rho$ is the probability distribution of the first state. 
+
+A policy $\pi(a|s)$ defines the probability of taking action $a$ at state $s$. A trajectory is defined by the execution of a policy from an initial state to the plaanning horizon: $\tau=\{s_1,a_1,s_2,...,s_H,a_H,s_{H+1}\}$ where $s_1\sim \rho$, $a_t\sim \pi(\cdot|s_t)$ and $s_{t+1}\sim \pi(\cdot|s_t, a_t)$. Given a MDP, an RL algorithm aims to find the optimal policy that yields the best total rewards $R(\tau) = \sum_tr(s_t,a_t)$, or some discounted form, from the initial state.
+
+\subsubsection{Value-based vs. Policy-based}
+We recall the three different types of Reinforcement Learning algorithms:
+\begin{enumerate}
+    \item Value-based: By learning from experience, we estimate a value function that scores a particular state or state-action pair and then use this value function to improve the policy.
+    \item Policy-based: Use the reward from interacting with the environment to directly optimize for the policy, without relying on a value function.
+    \item Hybrid: A hybrid of value-based methods and policy-based methods.
+\end{enumerate}
+Clearly, although the distinctions between the above three types of algorithm is clear, they share a common feature that the RL algorithms has to learn everything from experience. Imitation Learning algorithms, which we discussed in this lecture, allows learning from behavior demonstrated by an expert policy. Therefore, it could enable faster and better learning of the optimal policy. 
+
+\subsubsection{Model-based vs. Model-free}
+We also recall two different assumptions that Reinforcement Learning algorithms make:
+\begin{enumerate}
+    \item Model-based: The algorithm assumes knowing the transition dynamics function, $P(s'|s,a)$, and the reward function, $r(s,a,s')$.
+    \item Model-free: The algorithm does not make use of the transition function and the reward function.
+\end{enumerate}
+In Imitation Learning, there are also model-based algorithms, which requires dynamics function and reward function, and model-free algorithms, which does not depend on the model. In this lecture, we discussed the Inverse Reinforcement Learning algorithm. In IRL, we solve for the reward function, therefore the reward function of the model is not known to the IL algorithm. However, the two scenarios of the IRL we discussed in this lecture assumes known transition dynamics.
+
+\section{Summary}
+\subsection{Imitation Learning Definitions}
+\normalfont
+As the name suggests, the high level idea of Imitation Learning is learning from expert demonstrations or policies, which makes it different from Reinforcement Learning, which only  learns from experience. To formulate the Imitation Learning framework, we introduce the formal definition of IL:
+\[A_{IL}: \langle D^*,\pi^*, T, R\rangle \rightarrow \pi\]
+
+\begin{itemize}
+    \item \textbf{Expert demonstrations}
+    \begin{equation}
+        D^* = \{\zeta_n\}_{n=1}^N\sim \varepsilon|\pi^*
+    \end{equation}
+    Expert demonstrations are trajectories sampled from the optimal policy. The IL algorithms leverages these expert demonstrations to learn a good policy. In another word, The best reward function could also be interpreted as the policy that best \textit{explains} the given demonstrations. The expert demonstrations could be sequence of state: $\zeta=\{s_0, s_1,...s_T\}$, sequence of state-action pairs: $\zeta=\{s_0, a_0, s_1, a_1,...,a_{T-1},s_T\}$, or some other forms, depending on the specific algorithm. One real world example discussed in the lecture is learning optimal policy for a high dimensional manipulator arm. The expert demonstration could be the trajectory obtained from a grad student physically moving the robot arm so that it moves to a certain configuration.
+    \item \textbf{Optimal policy}
+    \begin{equation}
+        \pi^*(a|s)
+    \end{equation}
+    Optimal policy is the oracle policy that IL algorithm tries to learn and the expert demonstration samples from. Note that the optimal policy may or may not be available, depending on the algorithm. Specifically, only in a class of IL algorithm, namely, Interactive IL, is the optimal policy available. In Interactive IL, the optimal policy can be queried from whenever the algorithm needs. So the optimal policy can be thought of as a \textit{coach} that gives instructions in a specific state. Note also that even when the optimal policy is available, it can only be \textit{sampled from}, but not known in its parametric form. The inner work of the policy is still not provided to the IL algorithm. This makes sense because if the parameters of the optimal policy is given, the algorithm only needs to copy from the given policy and does not to learn anything.
+    \item \textbf{Dynamics function}
+    \begin{equation}
+        P(s'|s,a)
+    \end{equation}
+    Dynamics function is defined the same way as in Reinforcement Learning: the probability of reaching state $s'$ from state $s$ with action $a$ taken. Similar to the expert demonstration $D$ and the oracle policy $\pi^*$, the dynamics function is not always given. For example, passive IL algorithms, \textit{e.g.} the behaviour cloning algorithm, only makes use of demonstration and does not assume a known dynamics function.
+    \item \textbf{Reward function}
+    \begin{equation}
+        R(s,a,s')
+    \end{equation}
+    Reward function is also defined the same way as in Reinforcement Learning: in the most general form, the reward function defines what the agent achieves at a particular state $s$, taking action $a$ and reaches next state $s'$. In the two algorithms (IRL algorithm 1 and 2) we covered in this lecture, we aim to find the best reward function and does not have a given reward function.
+\end{itemize}
+
+Moving ahead, we define three types of Imitation Learning algorithms.
+
+\subsection{Types of Imitation Learning Algorithms}
+Table~\ref{tab:type} shows three types of Imitation Learning algorithms, based on different input information. In this section, we give a rough definition for each category of algorithms.
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|c|}
+\hline
+                       & Passive IL & Active IL & Interactive IL \\ \hline
+Demostration $D^*$     & yes        & yes       & optional       \\ \hline
+Environment $\varepsilon$ & no         & yes       & yes            \\ \hline
+Oracle $\pi^*$           & no         & no        & yes            \\ \hline
+Dynamics $T$             & no         & optional  & optional       \\ \hline
+Reward $R$               & no         & optional  & optional       \\ \hline
+\end{tabular}
+\caption{Three types of Imitation Learning algorithms.}
+\label{tab:type}
+\end{table}
+
+\subsubsection{Passive IL}
+Passive Imitation Learning (commonly called the \textit{behavior cloning} algorithm) only makes use of demonstrations to learn the policy. The set up is similar to a supervised learning algorithm: we optimized for the policy so that the behavior of the policy is close to the demonstration:
+\begin{equation}
+    \arg\min_\theta\sum_{\tau=\{s_t,a_t\}_{t=1}^T} l(\pi_\theta(a|s_t), a_t)
+\end{equation}
+As the name suggests, this approach clones the behavior of the expert demonstration by treating it as input-label pairs. Passive IL does not interact with the environment in any form.
+
+\subsubsection{Active IL}
+Active IL also gets expert demonstrations but also have access to the environment. Optionally, active IL algorithms have access to dynamics function and/or reward function. This is similar to the model-based and model-free distinction we have encountered in RL algorithms. In the next section, we will discuss Inverse Reinforcement Learning, which is a form of Active IL. IRL could have access to the dynamics function, but it does not make use of the reward function. 
+
+\subsubsection{Interactive IL}
+Interactive IL does not always have access for demonstration, but instead, it could have sample feedback from the oracle policy $\pi^*$ when the algorithm is interacting with the environment. The algorithm act in the environment, and when needed, ask for the oracle feedback to estimate the optimal policy. Interative IL provides \textit{sequential instructive} feedback, which is different from other learning algorithms we discussed earlier in this course (For example, RL provides \textit{sequential} but \textit{evaluative} feedback; PWEA provides \textit{instructive} but \textit{one-shot} feedback).
+
+
+\subsection{Inverse Reinforcement Learning (IRL)}
+Inverse Reinforcement Learning is a type of Imitation Learning algorithm. It is an Active IL algorithm which leverages both the expert demonstration and environment to learn, but it does not have the reward function. The objective of IRL can be interpreted as finding the optimal reward function that best \textit{explains} the expert demonstration. Once this reward function is found, it can be used to estimate a policy $\pi$ with a standard RL algorithm. 
+
+\subsubsection{Why IRL?}
+Model-based Reinforcement Learning algorithms estimate the optimal policy from a known dynamics model and a known reward function, but the reward function could be difficult to define. Furthermore, understanding why we take an action (reward function) could be more beneficial to learning a policy under a specific environment. This is because the learned knowledge (reward function) could generalize and be transferred into unseen environment.
+
+\subsubsection{Three LP-IRL Algorithms}
+Depending on the assumptions made, LP-IRL~\cite{ng2000algorithms} has three scenarios:
+\begin{enumerate}
+    \item IRL for finite state spaces
+    \item IRL for large state spaces
+    \item IRL from sampled trajectories
+\end{enumerate}
+Each scenario involves solving a linear programming problem, therefore the name of LP-IRL. In this lecture, we will only cover the first two scenarios (algorithm 1 and 2).
+
+\subsubsection{IRL for finite state spaces (algorithm 1)}
+\textbf{Goal:} Find the reward function(s) such that the policy is optimal. 
+
+\textbf{Assumptions}:
+\begin{itemize}
+    \item State space is finite.
+    \item Transition model is known.
+    \item Complete policy is known.
+\end{itemize}
+
+IRL for finite state spaces is the most easy case in the three LP-IRL algorithms with most assumptions. Moreover, these assumptions are usually not satisfied. For example, in real problems, the state space is often infinite, and the transition model is not known, and the complete policy is certainly not accessible. However, getting started from IRL for finite state spaces, we can better understand the ideas of IRL and the assumptions will be removed later.
+
+In order to set up the objective function for optimizing reward function $R$, we consider the reward function that leads to $Q^\pi(a,s)$. Intuitively, we want the optimal policy to achieve highest accumulative reward, and the difference between the cumulative reward of the best action and the cumulative reward of the second best action should be as large as possible. 
+
+Following this intuition, we can define the objective function as follows:
+\begin{equation}\label{eq:objective}
+    \max_R\{\sum_s Q^\pi(s,a^*)-\max_{a\neq a^*}Q^\pi(s,a)\}
+\end{equation}
+where $a*$ is the optimal action and $Q^\pi(s,a)$ is the state-action value function defined as
+\begin{align}
+    Q^\pi(s,a) = R(s)+\gamma\sum_{s'}p(s'|s,a)V^\pi(s')\\
+    V^\pi(s) = \sum_a\pi(a|s)Q(s,a)
+\end{align}
+
+However, naively optimize for Eq.~\ref{eq:objective} could lead to solutions where $Q^\pi(s,a^*)$ goes to infinity and other $Q$ values goes to negative infinity because $R$ is unbounded. Therefore, we add an extra regularization term to the objective function to penalize large reward values. The final objective function is the following:
+\begin{equation}\label{eq:objective_final}
+    \max_R\{\sum_s Q^\pi(s,a^*)-\max_{a\neq a^*}Q^\pi(s,a)\} - \lambda||R||_1
+\end{equation}
+
+\textbf{Linearity in matrix form}:
+First we express the $Q$ functions 
+\begin{equation}
+    Q^\pi(s,a) = R(s)+\gamma\sum_{s'}p(s'|s,a)V^\pi(s') \;\forall s,a 
+\end{equation}
+in matrix form:
+\begin{equation}
+    \mathbf{Q}^\pi(a)=(\mathbf{R}+\gamma\mathbf{P}_a\mathbf{V}^\pi) \;\forall a 
+\end{equation}
+where we reduce the number of equations from $s\times a$ to $a$ by expressing all the equations for a specific action in a matrix.
+
+Similarly, we could write the linear form of the $V$ function
+\begin{equation}
+    V^\pi(s) = R(s)+\gamma\sum_{s'}p(s'|s,\pi(s))V^\pi(s') \;\forall s
+\end{equation}
+as follows:
+\begin{align}
+    \mathbf{V}^\pi=(\mathbf{R}+\gamma\mathbf{P}_a\mathbf{V}^\pi)\\
+    \mathbf{V}^\pi=(\mathbf{I}-\gamma\mathbf{P}_a)^{-1}\mathbf{R}
+\end{align}
+
+Next, we write the difference in $Q$-values in linear form:
+\begin{align}
+    \mathbf{Q}^\pi(a^*) - \mathbf{Q}^\pi(a) &= (\mathbf{R}+\gamma\mathbf{P}_{a^*}\mathbf{V}^\pi) - (\mathbf{R}+\gamma\mathbf{P}_a\mathbf{V}^\pi) \\
+    &=\gamma(\mathbf{P}_{a^*}-\mathbf{P}_a)\mathbf{V}^\pi \\
+    &=\gamma(\mathbf{P}_{a^*}-\mathbf{P}_a)(\mathbf{I}-\gamma\mathbf{P}_a)^{-1}\mathbf{R}
+\end{align}
+
+Finally, we write the original objective function (Eq.~\ref{eq:objective_final}) in matrix form:
+\begin{equation}\label{eq:objective_final_matrix}
+    \arg\max_\mathbf{R}(\sum_s\min_a\{\gamma(\mathbf{P}_{a^*}-\mathbf{P}_a)(\mathbf{I}-\gamma\mathbf{P}_a)^{-1}\mathbf{R}\})-\lambda||\mathbf{R}||_1
+\end{equation}
+
+\textbf{Additional constraints: } We can add another constraint (as in the original paper) by making use of the following theorem. 
+\theorem{The future payoff of the best action is greater than that of another action.
+\begin{equation}\label{eq:constraint}
+    \sum_{s'}P(s'|s,a^*)V^\pi(s')\geq \sum_{s'}P(s'|s,a)V^\pi(s') \;\forall s,a
+\end{equation}}\label{theorem:1}
+\proof{\begin{align}
+    Q^{\pi^*}(a^*,s)&\geq Q^{\pi^*}(a,s) \\
+    r(s)+\gamma \sum_{s'}p(s'|s,a^*)V(s')&\geq r(s)+\gamma \sum_{s'}p(s'|s,a)V(s')\\
+    p(s'|s,a^*)V(s')&\geq \gamma \sum_{s'}p(s'|s,a)V(s')
+\end{align}}
+Then, we convert the constraint (Eq.~\ref{eq:constraint}) to matrix form:
+\begin{align}
+    \mathbf{p}_{sa^*}\mathbf{V}_\pi &\geq \mathbf{p}_{sa}\mathbf{V}_\pi \;\forall s,a\\
+    \mathbf{P}_{a^*}\mathbf{V}_\pi &\succeq \mathbf{P}_{a}\mathbf{V}_\pi \;\forall a \\
+    \mathbf{P}_{a^*}(\mathbf{I}-\gamma\mathbf{P}_a)^{-1}\mathbf{R} &\succeq \mathbf{P}_{a}(\mathbf{I}-\gamma\mathbf{P}_a)^{-1}\mathbf{R} \;\forall a \label{eq:constraint_final}
+\end{align}
+where $\succeq$ denotes element-wise inequality.
+
+\textbf{Linear Program Formulation:}
+Based on Eq.~\ref{eq:objective_final_matrix} and \ref{eq:constraint_final}, we have the linear program as follows:
+\begin{align}
+    \hat{\mathbf{R}} = &\arg\max_\mathbf{R}(\sum_s\min_a\{\gamma(\mathbf{P}_{a^*}-\mathbf{P}_a)(\mathbf{I}-\gamma\mathbf{P}_a)^{-1}\mathbf{R}\})-\lambda||\mathbf{R}||_1 \\
+    \text{s.t.} &\mathbf{P}_{a}(\mathbf{I}-\gamma\mathbf{P}_a)^{-1}\mathbf{R} \;\forall a\neq a^*\\
+    &|R(s)|\leq R_{max} \;\forall s\in S
+\end{align}
+which can be solved with a linear program routine.
+
+\subsubsection{IRL for large state spaces}
+\textbf{Goal:} Find the reward function(s) such that the policy is optimal. 
+
+\textbf{Assumptions}:
+\begin{itemize}
+    \item State space can be very large or infinite.
+    \item Transition model is known.
+    \item Complete policy is known.
+\end{itemize}
+
+IRL for large state spaces assumes that the state space could be very large or infinite. This means that the reward function cannot be stored as a table. Therefore, we use an approximation function to model the reward function. In the lecture, we use a linear function as the approximation function of the reward:
+\begin{equation}
+    R_\theta(s)=\theta_1\phi_1(s)+\theta_2\phi_2(s)+...+\theta_d\phi_d(s)=\theta^T\phi(s)
+\end{equation}
+
+Of course, we could also use a non-linear function, such as a deep network. However, such reward function cannot be solved by a LP, so we will keep using a linear function in the following discussion.
+
+Now, if the reward function is a linear function of the state features, we can show that the value function can also be expressed as a linear function of expected state features.
+\theorem{Value function is a linear function of expected state features:
+\begin{equation}
+    V^\pi(s)={\theta}^T{\mu}^\pi(s)
+\end{equation}}
+
+\proof{Begin from the definition of the value function,
+\begin{align}
+    V^\pi(s) &= E_p[\sum_{t=0}^\infty \gamma r(s_t)] \\
+    &= E_p[\sum_{t=0}^\infty \gamma \theta\cdot\phi(s_t)] \\
+    &= \theta\cdot E_p[\sum_{t=0}^\infty \gamma \phi(s_t)] \\
+    &= \theta\cdot\mu^\pi (s)
+\end{align}
+where $\mu^\pi(s)=E_p[\sum_{t=0}^\infty \gamma \phi(s_t)]$.\QED}
+
+Recall that the future payoff of the best action is greater than that of any other actions (as we proved in Theorem~\ref{theorem:1}:
+
+\begin{equation}
+    \sum_{s'}P(s'|s,a^*)V^\pi(s')\geq \sum_{s'}P(s'|s,a)V^\pi(s') \;\forall s,a
+\end{equation}
+
+and we would like to make this difference as big as possible,
+\begin{equation}
+    \max_\theta(E_{s'\sim p(s,a^*)}[V^\pi(s')]\geq E_{s'\sim p(s,a)}[V^\pi(s')]) \;\forall s,a
+\end{equation}
+Note here the value function $V$ depends on parameter $\theta$. Because we have infinite number of states, we only optimize for a finite subset $s\in S_0 \subset S$. For actions, we only optimize for the second best action. This gives us the following objective function:
+\begin{equation}
+    \max_\theta\min_a(E_{s'\sim p(s,a^*)}[V^\pi(s')]\geq E_{s'\sim p(s,a)}[V^\pi(s')]) \;\forall s\in S_0
+\end{equation}
+
+Finally, we can write the linear program like what we did in IRL for finite state spaces:
+\begin{align}
+    \max_\theta&\sum_{s\in S_0}\min_a(E_{s'\sim p(s,a^*)}[V^\pi(s')]\geq E_{s'\sim p(s,a)}[V^\pi(s')])  \\
+    \text{s.t.} &|\theta_d| \leq 1 \;\forall d
+\end{align}
+
+Note that in the original paper, there is an additional function $g$ that helps the program to converge faster
+\begin{align}
+    \max_\theta&\sum_{s\in S_0}\min_a g(E_{s'\sim p(s,a^*)}[V^\pi(s')]\geq E_{s'\sim p(s,a)}[V^\pi(s')])  \\
+    \text{s.t.} &|\theta_d| \leq 1 \;\forall d\\
+    &g(x) = 
+  \begin{cases}
+    x, &  x \geq 0\\
+    2x, & \text{otherwise} 
+  \end{cases}
+\end{align}
+The idea here is to put extra penalty when the future payoff of the best action is less than that of the other actions.
+
+
+%\section*{References}
+%Include your references here. Please cite any resources you found useful.	
+%Populate the refs.bib file or list your references manually. Be consistent in formatting!
+{
+\bibliography{refs}
+\bibliographystyle{abbrv}
+}
+
+%\section{Appendix}
+%This section provides any relevant background material that was not covered in the lectures, but was found to be useful for understanding the material. 
+%For example, derivations, theory underlying techniques employed, etc. 
+
+%Additionally, this section can summarizes applications or extensions of these techniques found in the literature. 
+
+\end{document} % Done!
+
+
