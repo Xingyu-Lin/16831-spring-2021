@@ -171,14 +171,14 @@ With this, we noticed that if we set $\eta$ to $\frac{1}{\sqrt{T}}$, the average
 
 Linear classification algorithms are usually allowed to make use of all available data altogether. On the other hand, in an online learning scenario, a learning algorithm has to consider the training samples one by one. Here we will include two online linear classification algorithms, the Perceptron algorithm and the Winnow algorithm. They are similar in many ways, while using different approaches to update the model parameters and assumes different assumptions. Online Linear Classification falls into the category of Online Learning Classification, and the comparison between PWEA could be seen below:
 
-\includegraphics[width=\linewidth]{img/diagram.png}
+% \includegraphics[width=.6\linewidth]{img/diagram.png}
 
-% \begin{figure}[H]
-%     \centering
-%     \includegraphics[width=\linewidth]{img/diagram.png}
-%     \caption{Caption}
-%     \label{fig:my_label}
-% \end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=.6\linewidth]{img/diagram.png}
+    % \caption{Caption}
+    % \label{fig:my_label}
+\end{figure}
 
 
 \section{Perceptron Algorithm}
@@ -223,8 +223,7 @@ We derive the mistake bound for the Perceptron Algorithm. Recall the 5-step stra
     M \leq \frac{R^{2}}{\gamma^{2}}
 \end{align}
 
-\proof{\textbf{Upper bound of the potential function.} We start by defining the potential function as:
-
+\proof{\textbf{Upper bound of the potential function.} We start by defining the potential function:
 \begin{align}
   \Phi^{(t)} = \norm{\pmb{w} ^ {(t)}}^{2} = \sum_{n=1} {(w_n^{(t)})}^{2}\label{eq:perceptron_potential}
 \end{align}
@@ -292,24 +291,16 @@ thus the lower bound to the original potential function is $\Phi^{(T)} \ge (M^{(
    \Phi^{(T)} \le M^{(T)} R^{2} \,\,\, &, \Phi^{(T)} \ge (M^{(T)} \gamma)^{2}\,, \nonumber \\
    (M^{(T)} \gamma)^{2} &\le M^{(T)} R^{2} \, , \nonumber \\
    M^{(T)} &\le \frac{R^2}{\gamma^2} \, .
-\end{align} \QED
+\end{align}
 }
-
-\textbf{Interpreting the mistake bound.} The margin $\gamma$ represents the degree to which the data is separable. When $\gamma$ is large, $M$ becomes smaller since it is easier for the learner to classify the data. On the other hand, the norm $R$ represents a ``hyperball'' that contains all observations. When $R$ is large, it becomes harder for the learner to handle the instance. Therefore, $M$ becomes smaller as well.
-
+\textbf{Interpreting the mistake bound.} The margin $\gamma$ represents the degree to which the data is separable. When $\gamma$ is large, $M$ becomes smaller since it is easier for the learner to classify the data. On the other hand, the norm $R$ represents a ``hyperball'' that contains all observations. When $R$ is large, it becomes harder for the learner to handle the instance. And $M$ becomes smaller as well.
 %%%%%%%%%%%
-
 \section{Winnow Algorithm}
-
 \subsection{Overview}
-The Goal of the Winnow Algorithm is to learn a linear classifier from labeled data. It's applied to problems whose inputs are binary features and outputs (labels) are binary predictions/labels. It can be used for both online and offline settings.
-
-The Winnow Algorithm assumes that the problem can be represented as a disjunctive boolean function. That is, only a certain subset of the input features are relevant to the classification task. It means that the output is actually the logical OR of the relevant features.
+The Goal of the Winnow Algorithm is to learn a linear classifier from labeled data. It's applied to problems whose inputs are binary features and outputs (labels) are binary predictions/labels. It can be used for both online and offline settings. The Winnow Algorithm assumes that the problem can be represented as a disjunctive boolean function. That is, only a certain subset of the input features are relevant to the classification task. It means that the output is actually the logical OR of the relevant features.
 
 \subsection{Winnow Algorithm}
-
 A single sample \textbf{$x$} can be denoted as $\{x_1, x_2, ..., x_N\}$, where $x_i$ is the value of a single boolean feature and there are $N$ input features. The learning process of the Winnow Algorithm is as follows.
-
 \begin{algorithm}[H]
 \caption{Winnow Algorithm}
 \label{algo:winnow}
@@ -346,18 +337,66 @@ The Winnow Algorithm is similar to the Perceptron Algorithm, with the following 
 \end{algorithm}
 
 \subsection{Explanation}
-
-From a high level point of view, the classifier learns a weight for each attribute and uses the sum of the weights of triggered (by a sample) attributes to make a prediction. Specifically, if the sum of the weights is greater than a predefined threshold, which is $N$ in this case, the classifier predicts 1, otherwise 0.
-
+From a high level point of view, the classifier learns a weight for each attribute and uses the sum of the weights of triggered (by a sample) attributes to make a prediction. Specifically, if the sum of the weights is greater than a predefined threshold, which is $N$ in this case, the classifier predicts 1, otherwise 0. \\
 During the learning process, whenever a prediction is incorrect, update the weights (by multiplication) of the attributes triggered by the sample toward the direction of the true label. For instance, if a sample triggers attribute $x_1$, $x_3$, $x_5$ and the classifier predicts 0 but the true label is 1, the weights of the attributes, $x_1$, $x_3$, $x_5$ are multiplied by $(1 + \beta)$. On the other hand, if the classifier predicts 1 but the true label is 0, the weights of the attributes, $x_1$, $x_3$, $x_5$ are multiplied by $1 / (1 + \beta)$.
 
-The number of mistakes of the Winnow Algorithm, $M$, has an upper bound:
-
+\vspace{-5mm}
+\subsection{Mistake Bound}
+\vspace{-4mm}
+Now we try to obtain a mistake bound for the Winnow algorithm. First, we define a potential function to assists our calculation. The potential function at time $t$ is defined as:
 \begin{align}
-  M < 2 + 3k(\log_2 N + 1)
+    \Phi^t = \sum_n w_n^{(t)}
 \end{align}
+We separate the mistakes into those on positive examples $m^+$ and that on negative examples $m^-$.
+\begin{align}
+    m = m^- + m^+
+\end{align}
+We assume that $\beta$ is 1. We first consider the mistakes on positive examples. Knowing that weights are increased rather than decreased on a positive example, we have
+\begin{align}
+    \Phi^t = \Phi^{t-1} + \pmb{w}^{(t-1)} \cdot \pmb{x}^{(t-1)}
+\end{align}
+Knowing that $\pmb{w}^{(t-1)} \cdot \pmb{x}^{(t-1)} < N$ when a mistake on a positive example occurs,
+\begin{align}
+    \Phi^t \leq \Phi^{t-1} + N
+\end{align}
+Now consider that we have $m^+$ such mistakes, we have
+\begin{align}
+    \Phi^t \leq N + m^+ N
+\end{align}
+Then, we take a look at the mistakes on negative examples. As the weights are reduced by half in this case,
+\begin{align}
+    \Phi^t = \Phi^{t-1} - \sum_{n: x_n^{(t)} = 1} \frac{1}{2}w_n^{t-1} = \Phi^{t-1} - \frac{1}{2}w^{t-1} \cdot x^{t-1}
+\end{align}
+Knowing that $w^{t-1} \cdot x^{t-1} > N$ when a mistake on a negative sample occurs, we have
+\begin{align}
+    \Phi^t < N - m^- \frac{1}{2} N
+\end{align}
+With these two upper bounds, we obtain that
+\begin{align}
+    \Phi^t \leq N + m^+ N - m^- \frac{1}{2} N
+\end{align}
+And this is the upper bound of the potential function. As for the lower bound, we can trivially take 0. Combining the two bounds, we have
+\begin{align}
+    0 \leq N + m^+ N - m^- \frac{1}{2} N
+    \implies m^- < 2 + 2m^+
+\end{align}
+Recall that what we attempt to upper bound here is $m^+ + m^-$, so if we can find an upper bound for $m^+$, we can create the $m^+ + m^-$ term from the inequality above.
 
-where $k$ is the number of relevant features.
+There are two helpful conditions that we can obtain easily. The first one is that the weight of a certain feature after it makes $m$ mistakes is $2^m$. The other is that when a mistake on a positive example is made, $w_n^{(t)}$ must be smaller than $N$, otherwise the mistake would be gone. Combining these two trivial conditions, we can obtain that
+\begin{align}
+    w_n^{(t)} = 2^{m^+-1} < N\\
+    \implies m^+ < log_2N + 1
+\end{align}
+Now assume that there are $k$ relevant features, in total there would be
+\begin{align}
+    m^+ < k(log_2N + 1)
+\end{align}
+Inserting this into equation 27, we can get the upper bound of $m^-$ as well:
+\begin{align}
+    m^- < 2 + 2k(log_2N + 1) \\
+    \implies m = m^+ + m^- < 2 + 3k(log_2N + 1)
+\end{align}
+This is the upper bound of the number of mistakes made by the Winnow Algorithm.
 
 \section{Conclusion}
 The goal of the online learning classification is for the autonomous system, where experts will work along side and give the `correct' classification. It aims to facilitate the autonomous system to learn a good classifier over time. We covered two online learning classification algorithm: the Perceptron Algorithm and the Winnow Algorithm. The Perceptron Algorithm adopted additive approach for its update rule. It is fast in both aspect of prediction and update, but have no notion of regret. Assuming linear separability, the number of mistakes will converge. On the other hand, the Winnow Algorithm uses multiplicative rule for updating the weight, and is adopted to learn the logical OR function of $k$ relevant attributes. 

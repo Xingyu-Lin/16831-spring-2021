@@ -1,0 +1,464 @@
+\documentclass[11pt]{article}
+\usepackage{latexsym}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{epsfig}
+\usepackage{bbm}
+\usepackage[tight]{subfigure}
+
+\usepackage{amsmath}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\minimize}{min}
+\DeclareMathOperator*{\maximize}{max}
+
+\usepackage{algorithm}
+ %on linux you may need to run sudo apt-get install texlive-full to install algorithm.sys
+% \usepackage{algorithmic}
+\usepackage{algpseudocode}
+
+\usepackage{verbatim}
+
+\newcommand{\handout}[5]{
+  \noindent
+  \begin{center}
+  \framebox{
+    \vbox{
+      \hbox to 5.78in { {#1} \hfill #2 }
+      \vspace{4mm}
+      \hbox to 5.78in { {\Large \hfill #5  \hfill} }
+      \vspace{2mm}
+      \hbox to 5.78in { {\em #3 \hfill #4} }
+    }
+  }
+  \end{center}
+  \vspace*{4mm}
+}
+
+\newcommand{\lecture}[5]{\handout{#1}{#2}{#3}{#4}{#5}}
+\newcommand{\collision}[0]{\mathrm{collision}}
+\newcommand{\nocollision}[0]{\overline{\collision}}
+
+\newcommand*{\QED}{\hfill\ensuremath{\square}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{observation}[theorem]{Observation}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{note}[theorem]{Note}
+
+% 1-inch margins, from fullpage.sty by H.Partl, Version 2, Dec. 15, 1988.
+\topmargin 0pt
+\advance \topmargin by -\headheight
+\advance \topmargin by -\headsep
+\textheight 8.9in
+\oddsidemargin 0pt
+\evensidemargin \oddsidemargin
+\marginparwidth 0.5in
+\textwidth 6.5in
+
+\parindent 0in
+\parskip 1.5ex
+%\renewcommand{\baselinestretch}{1.25}
+
+\begin{document}
+
+\lecture{Statistical Techniques in Robotics (16-831, S21)}{Lecture \#24
+  (Wednesday, April 28)}{Lecturer: Kris Kitani}{Scribes: Ingrid Navarro, Zach Patterson}{Max-Margin IRL and Max-Margin Planning}
+
+\section{Review}
+Reinforcement Learning is great, but it takes a very long time to learn because everything has to be learned from experience. To increase learning speed, inspired by childhood learning, we can learn by demonstration of a human (or other "expert"). This is called Imitation Learning, although it's also known as Learning from Demonstration, apprenticeship learning, behavior cloning, or inverse reinforcement learning. We can think of this class of learning as belonging to one of three types, shown in Table \ref{table1}. Briefly, in Passive IL, the policy is learned from expert demonstrations alone. In Active, the agent learns from demonstrations but also is able to act in the environment (this is the most common currently). In Interactive, the agent can learn from demonstrations and act in the environment, but also can allow for an "oracle" to step in for a new demonstration - think self driving cars asking the human to navigate a particularly complex situation. 
+
+\begin{center}
+\begin{tabular}{ |c|c|c|c|c| } 
+ \hline
+  & \textbf{Passive IL} & \textbf{Active IL} & \textbf{Interactive IL} \\ 
+ \hline
+ Demonstrations $\mathcal{D}$ & yes & yes & optional \\ 
+ \hline
+ Environment $\mathcal{E}$ & no & yes & yes \\ 
+ \hline
+ Oracle $\pi$ & no & no & yes \\ 
+ \hline
+ Dynamics $\mathcal{T}$ & no & optional & optional \\ 
+ \hline
+ Reward $\mathcal{R}$ & no & optional & optional \\ 
+ \hline
+\end{tabular}\label{table1}
+\end{center} 
+
+Here, we will focus on a type of Active IL called Inverse Reinforcement Learning (IRL). It's called this because we, in a sense, invert the RL problem by using sampled expert demos to find a reward function. This helps us understand \textit{why} the expert takes a certain action rather than just blindly following a learned expert policy (which may not generalize well). So we can transfer this learned reward function to generate new policies in new environments. In the rest of these notes, we'll cover several IRL algorithms. For the rest of this review section, we'll briefly review two Linear Program IRL \cite{LPIRL} algorithms leading into our full LP IRL for sampled trajectories discussion in the Summary section.  \\
+
+The first algorithm assumes finite state spaces, a known transition model, and a known complete policy (all of which are not very realistic). To generate an objective function, the goal of this algorithm is to maximize the difference between the cumulative rewards for the expert policy and that of the next best policy:
+
+\begin{equation}
+    \maximize_{\mathbf{R}} \{\sum_s Q^{\pi}(s, a^*) - \maximize_{a \ne a^*} Q^{\pi}(s,a)\} - \lambda ||\mathbf{R}||_1.
+\end{equation}
+
+We added regularization to stabilize the optimization. Following the definition of Q, we can derive the objective function:
+\begin{equation}
+    \argmax_{\mathbf{R}} (\sum_s \minimize_a \{(\mathbf{P}_{a^*}(s) - \mathbf{P}_{a}(s))(\mathbf{I}_ \gamma \mathbf{P}_{a^*}(s))^{-1} \mathbf{R}\} - \lambda ||\mathbf{R}||_1.
+\end{equation}
+
+where \textbf{P} is the MDP dynamics and \textbf{R} is the matrix of rewards. This is a linear program that can be solved by typical linear program algorithms. See previous notes for a full derivation. \\
+
+To adapt this algorithm for higher dimensional state spaces, we can approximate the reward function with a linear function (or a deep neural network), where the linear function is a function of some features of state:
+
+\begin{equation}
+    R(x;\theta) = \sum_n \theta_n f_n(x) = \boldsymbol{\theta^{\top}} \boldsymbol{\phi}(s).
+\end{equation}
+
+These features can, for example, represent a predicted classification (car, human, bicycle, etc). This allows us to write the value function as a linear function of expected state features
+
+\begin{equation}
+\begin{split}
+    V^{\pi}(s) & = \mathbb{E}[\sum_{t=0}^{\infty} \gamma^t r(s^{(t)})| s^{(0)} = s] \\
+     & = \mathbb{E}[\sum_{t=0}^{\infty} \gamma^t \boldsymbol{\theta^{\top}} \boldsymbol{\phi}(s^{(t)})| s^{(0)} = s] \\
+     & = \boldsymbol{\theta^{\top}} \cdot \mathbb{E}[\sum_{t=0}^{\infty} \gamma^t \boldsymbol{\phi}(s^{(t)})| s^{(0)} = s]  \\
+    V^{\pi}(s) & = \boldsymbol{\theta^{\top}}\boldsymbol{\mu^{\pi}}(s) \\
+\end{split}
+\end{equation}
+
+where $\boldsymbol{\mu}$ is the expected feature count. So, the concept for our objective function is similar here; we want to maximize the difference in our rewards for the expert policy and the next best policy, but this time it's over expected rewards so we'll maximize the difference between our value functions:
+
+
+\begin{equation}
+        \begin{split}
+            \displaystyle \maximize_{\theta} & \sum_{s \in S_0} \minimize{a}(\mathbb{E}_{p(s,a^*)}[V^{\pi}(s)] - \mathbb{E}_{p(s,a)}[V^{\pi}(s)]) \\
+             & \textrm{s.t.} |\theta_d| \leq 1 \quad \forall d 
+        \end{split}
+    \end{equation}
+Remember, the value function contains the reward approximation function so we're still maximizing the difference between rewards. Additionally, we added the minimization so we're only comparing to the next best policy (so we don't have to compare to every policy). Finally, we sample from states $S_0$ instead of the full set of states - because the full set of states is infinite. We add the constraint to make sure that the solution does not explode.
+%This section serves as a review of the previous lecture and any other context required to frame the content of the current lecture. 
+
+%You may format the scribes in any way you like, aside from changing font style, size and page format. Please use subsections and paragraphs to increase the readability of your notes.
+
+%Length requirement 1-2 pages.
+% \subsection{Max-Margin IRL}
+
+% This section provides an overview of Max-Margin IRL \cite{MMIRL}
+
+% \subsection{Max Margin Planning}
+
+\section{Summary}
+
+\subsection{Linear Program IRL}
+The previous objective function is derived with the assumption that we know the transition model and the policy, but this is usually not true. We usually only have expert trajectories, from which we'll need to estimate the value function. We want to use 
+
+\begin{equation}
+    V^{\pi}(s) = \boldsymbol{\theta^{\top}}\boldsymbol{\mu^{\pi}}(s)
+\end{equation}
+
+to estimate the value function, but we can't compute the expected feature count without the policy and transition dynamics. So, how do we obtain this information? There are multiple methods, but here we will use Monte Carlo Prediction, wherein we treat M expert trajectories as random Monte Carlo samples.
+
+\begin{equation}
+\begin{split}
+    \boldsymbol{\mu^{\pi}}(s) & = \mathbb{E}[\sum_{t=0}^{\infty} \gamma^t \boldsymbol{\phi}(s^{(t)})] \\
+    & \approx \frac{1}{M} \sum_{m=1}^M \sum_{t=0}^{T_m}\gamma^t \boldsymbol{\phi}(s_m^{(t)}).
+\end{split}
+\end{equation}
+
+So now, as before, we want to maximize the difference between the value function estimate under some optimal policy and the estimate under some other policy,
+
+\begin{equation}
+    \maximize_{\theta}\{\hat{V}^{\pi^*}(s) - \hat{V}^{\pi}(s)\}.
+\end{equation}
+
+However, this is not quite complete yet. For one, there is no bound on the reward parameter $\theta$ so the solution will go to infinity. The other, more subtle problem is that we don't know where to get the 'other' policy. For the first issue, we simply regularize $\theta$. For the second issue, we can use Reinforcement Learning.
+
+The following is the regularized objective function for the linear program that we will use to solve this IRL problem:
+\begin{equation}
+        \begin{split}
+            \displaystyle \boldsymbol{\hat{\theta}} & =  \argmax_{\theta} \{\sum_{n} \hat{V}^{\pi^*}(s) - \hat{V}^{\pi_n}(s)\}. \\
+             & \textrm{s.t.} |\theta_d| \leq 1 \quad \forall d.
+        \end{split}
+    \end{equation}\label{lp-obj}
+
+With this objective function in mind, we can write the LP-IRL algorithm (see \ref{algo:lp_irl}).
+
+\begin{algorithm}[H]
+    \label{algo:lp_irl}
+    \caption{LP-IRL}
+    \begin{algorithmic}[1]
+    \Function{LP-IRL}{$\pi_0$}
+    \State $\mathcal{D^*} = \{\zeta_j^*\}_{j=1}^J \textrm{ where } \zeta_j^* \sim \mathcal{E}|\pi^*$
+    \For{$t=1, \dots, T$}
+    \State $\hat{V}^{\pi^*} = \Call{MC-Prediction}{\mathcal{D^*}, r_{\theta_t}}$
+    \State $\mathcal{D} = \{\zeta_k\}_{k=1}^K \textrm{ where } \zeta \sim \mathcal{E}|\pi_{t-1}$
+    \State $\hat{V}^{\pi_t},\pi_t = \Call{MC-Control}{\mathcal{D}, r_{\theta_t}}$
+    \State $\theta^{t+1} = \Call{LinearProg}{\hat{V}^{\pi^*}, \{\hat{V}^{\pi_n}\}_{n=1}^t}$
+    \EndFor \\
+    \Return $\theta$
+    \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+Going line by line, line 2 is sampling from the expert demonstrations, line 4 approximates the value function from the expert policy using Monte Carlo, line 5 samples trajectories under the current policy and then line 6 uses Monte Carlo Control to approximate the value function and update the policy - this is the Reinforcement Learning subroutine - and line 7 runs a linear program over the previously specified objective function (Equation \ref{lp-obj}) to optimize reward parameters.
+
+
+\subsection{Matrix Game IRL}
+In this section we will derive a game theoretic approach to the IRL problem following \cite{MGIRL}. In this paradigm, we'll use what is called the policy value to derive our objective function. In the past, when we have written the value function, we have taken the expectation over the MDP dynamics and policy starting from a given initial state s. In the following, we will take the expectation over an initial probability distribution of starting states. We will adopt the following shorthand to denote this policy value $\mathbb{E}[V^{\pi}(s)] \rightarrow V(\pi)$. Now, similar to before, we can derive an approximation of the policy value in terms of expected policy features (the expected future feature counts by following the policy over all possible starting points):
+
+\begin{equation}
+\begin{split}
+    V(\pi) & =  \mathbb{E}_p[\sum_{t=0}{\infty} \gamma^t r(s_t)] \\
+    & = \mathbb{E}_p[\sum_{t=0}{\infty} \gamma^t \theta \phi(s_t)] \\
+    & = \boldsymbol{\theta} \cdot \mathbb{E}_p[\sum_{t=0}^{\infty} \gamma^t \phi(s_t)] \\
+    & = \boldsymbol{\theta} \cdot \boldsymbol{\mu(\pi)}.
+\end{split}
+\end{equation}
+
+Now we need to derive our objective function. As before, we want the value of our expert policy to be better than any other policy;
+
+\begin{equation}
+    V(\pi^*) \geq V(\pi).
+\end{equation}
+
+We can rewrite the above by substituting our previously derived expression in expected policy features:
+
+\begin{equation}
+    \boldsymbol{\theta} \cdot \boldsymbol{\mu(\pi)^*} \geq \boldsymbol{\theta} \cdot \boldsymbol{\mu(\pi)}.
+\end{equation}
+
+Now, we'd like to have the largest possible difference between these terms, and we'd like to have that relation between the expert policy (now represented by $\pi_E$ and the best 'other' policy. Similar to before, we can write this in terms of an optimization problem, but this time we flip signs and write it as a minimum over the whole function with a maximum expected value of the next best policy:
+
+\begin{equation}
+    \minimize_{\theta}\{\maximize_{\pi} \boldsymbol{\theta} \cdot \mu(\pi) - \boldsymbol{\theta} \cdot \mu(\pi_E)\}.
+\end{equation}
+
+We can pull the parameter vector $\boldsymbol{\theta}$ out to get the following simplified expression, 
+
+\begin{equation}
+    \minimize_{\theta}\{\maximize_{\pi} \boldsymbol{\theta^{\top}} (\mu(\pi) - \mu(\pi_E))\}.
+\end{equation}
+
+That vector is a 1xN vector of the feature parameters. By adjusting our notation, we can understand $(\mu(\pi) - \mu(\pi_E))$ as a matrix multiplication between a NxM matrix, $\boldsymbol{G}$, and a Mx1 vector, $\boldsymbol{\psi}$;
+
+\begin{equation}
+    \minimize_{\theta}\{\maximize_{\pi} \boldsymbol{\theta^{\top}} \boldsymbol{G} \boldsymbol{\psi}\}.
+\end{equation}
+
+This notation reveals that IRL is a two player game (see \cite{von2007theory}) where $\boldsymbol{G}$ specifies the game, $\boldsymbol{\theta}$ specifies the row player, and $\boldsymbol{\psi}$ specifies a column player (adversarial). $N$ is the number of features and $M$ is the number of deterministic policies. \\
+
+Using the knowledge that IRL can be understood as a two player game, we can adapt well known algorithms developed to solve such games to solve this problem, such as the Multiplicative Weights Algorithm.
+
+
+\begin{algorithm}[H]
+    \label{algo:mw_matrix_game}
+    \caption{Multiplicative Weights Matrix Game}
+    \begin{algorithmic}[1]
+    \Function{MW-MatrixGame}{$\beta$}
+    \State $\boldsymbol{w}^{(0)} \leftarrow \{ w_r^{(0)} = 1\}$
+    \For{$t=1, \dots, T$}
+    \State $R^{(t)} = \frac{\boldsymbol{w}^{(t-1)}}{\sum_r w_r^{(t-1)}}$ 
+    \State \Call{Receive}{$\boldsymbol{l}^{(t)} = \boldsymbol{\text{G}}(\cdot, \boldsymbol{c}^{(t)})$}
+    \State $w_r^{(t)} = w_r^{(t-1)} \beta^{l_r^{(t)}} \quad \forall r$
+    \EndFor \\
+    \Return $\boldsymbol{\theta}$
+    \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+Walking through this algorithm, line 4 designates the row player strategy, line 5 shows the game matrix and the column player strategy, and line 6 updates the row player strategy. When we walk through the Multiplicative Weights Algorithm (see \ref{algo:mw_matrix_game}, we can see that this is really online exponentiated gradient descent (line 6), which brings the class rather full circle. Using the MW Algorithm, we can write a Multiplicative Weights IRL Algorithm.
+
+\begin{algorithm}[H]
+    \label{algo:mw_irl}
+    \caption{Multiplicative Weights IRL}
+    \begin{algorithmic}[1]
+    \Function{MW-IRL}{$\hat{\pi}_E, \hat{\mu}_E, \beta$}
+    \State $\boldsymbol{\theta} \leftarrow 0$
+    \For{$t=1, \dots, T$}
+    \State $\theta_i = \frac{\theta_i}{\sum_{i^{'}} \theta_{i^{'}}} \quad \forall i$
+    \State $\hat{\pi}_\theta = $ \Call{RL}{$r(\cdot; \boldsymbol{\theta})$}
+    \State $\hat{\mu} = $ \Call{Estimate}{\hat{$\pi_\theta$}}
+    \State $\theta_i = \theta_i \cdot \exp{\{\ln{\beta \cdot G_i(\hat{\mu_i})}\}} \quad \forall i$
+    \EndFor \\
+    \Return $\boldsymbol{\theta}$
+    \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+For a derivation and in depth coverage of the above, please see \cite{MGIRL}. Briefly and essentially, we update our weights (line 4), use RL over our reward parameter to calculate some optimal policy $\hat{\pi}$ (line 5), use the optimal policy to calculate the expected feature count $\hat{\mu}$ (line 6), before updating with exponentiated gradient descent. Lines 5 and 6 can be understood as a 'prediction step' where the actual game is played.
+
+\subsection{Max Margin IRL}
+
+The section that follows provides a summary of the Max-Margin IRL algorithm which was introduced in \cite{MMIRL} as a quadratic programming problem for IRL. Max-Margin IRL is not guaranteed to recover a true reward function, however, it will find a policy that performs as well as the expert. Furthermore, the algorithm was shown to terminate in a small number of iterations.  
+
+The setting for this algorithm is framed as a MDP where a reward function is not available, rather, the agent observes expert behavior from which will attempt to recover the unknown reward. This setting assumes that such reward can be expressed as linear combination of known "features". 
+
+More formally (and following the notation introduced in the previous sections), we can express the optimization problem for Max-Margin IRL as:
+\begin{equation}
+    \begin{split}
+    \max_\theta ~t& \quad \text{ where $t$ is a margin variable}\\
+    &\text{s.t. } \boldsymbol{\theta}^T \boldsymbol{\mu}(\pi^\ast) \geq \boldsymbol{\theta}^T \boldsymbol{\mu}(\pi) + t \quad \forall \pi
+    \end{split}
+\end{equation}
+i.e., we want to find a reward function for which the expert policy does better by a margin. 
+
+At this point there are two main problems:
+\begin{enumerate}
+    \item There is no bound on the reward parameters (parameters can explode!)
+    \item We cannot compare against all possible policies
+\end{enumerate}
+
+Now, to address the former issue, we can regularize the parameters of the reward function. For the latter, we can leverage reinforcement learning to find $n$ valid policies to compare against. 
+
+Through this approach, the regularized objective thus becomes:
+\begin{equation}
+    \begin{split}
+    \max_\theta ~t& \\
+    &\text{s.t. } \boldsymbol{\theta}^T \boldsymbol{\mu}(\pi^\ast) \geq \boldsymbol{\theta}^T \boldsymbol{\mu}(\pi) + t \quad \forall \pi \\
+    &\quad ~||\boldsymbol{\theta}||_2 \leq 1
+    \end{split}
+\end{equation}
+
+We can further re-write the objective as a minimization as follows:
+\begin{equation}
+    \label{eq:min_obj_mmirl}
+    \begin{split}
+        \min\limits_{\theta, t} & \quad\lambda ||\boldsymbol\theta||_2 - t \\
+        & \textrm{s.t.} \quad \boldsymbol{\theta}^T(\boldsymbol{\mu}(\pi^\ast) - \boldsymbol{\mu}(\pi)) \geq t \quad \forall \pi_n \in \Pi
+    \end{split}
+\end{equation}
+
+We can observe that above minimization objective follows a similar form to the objective of a SVM max-margin classifier:
+\begin{equation}
+    \begin{split}
+        \min\limits_{w, \xi} & ||\boldsymbol{w}||_2 + C\sum\lmits_i \xi_i \\
+        & \textrm{s.t.} \quad y_i (\boldsymbol{w}^T\boldsymbol{x}_i +b) \geq 1 - \xi_i
+    \end{split}
+\end{equation}
+
+This shows that IRL can be framed as a max-margin classifier. In this class, such types of problems have been solved using online gradient descent. Nonetheless, Max-Margin IRL can also be solved using quadratic programming, and Algorithm~\ref{algo:mm_irl} showcases the procedure to do so.
+
+\begin{algorithm}[H]
+    \label{algo:mm_irl}
+    \caption{Max-Margin IRL}
+    \begin{algorithmic}[1]
+    \Function{MM-IRL}{$\mu(\pi^{\ast})$}
+    \For{$i=1, \dots n$}
+    \State $\hat{\pi} = \text{argmax}_\pi \boldsymbol{\theta}^{T} \boldsymbol{\mu}(\pi)$
+    \State $\boldsymbol{\mu}(\hat{\pi}) = \mathbb{E}_{p_0, \mathcal{T}, \hat{\pi}}\big[\sum\limits_{t=0}^\infty \gamma^{t} \phi(s_t)\big]$
+    \State $\boldsymbol{\theta} = $ \Call{QuadProg}{$\lambda, \boldsymbol{\mu}(\pi^\ast), \{ \boldsymbol{\mu}(\hat{\pi})\}_{n=1}^i$}
+    \EndFor \\
+    \Return $\boldsymbol{\theta}$
+    \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+Line by line, the algorithm goes as follows: line 2 is iterates from $i=1$ to $i=n$, where $n$ represents the number of policies that we are using. Line 3 estimates an optimal policy using RL with the current estimate of the reward parameters $\boldsymbol{\theta}$. Line 4 computes the expected policy value, and line 5: updates the parameters using the computed features. Note that line 5 can be replaced to use online gradient descent instead of quadratic programming to perform the parameter update. Finally, line 7 returns $\boldsymbol \theta$ once we have gone through all of the available policies. 
+
+\subsection{Structured Output Max Margin IRL}
+
+This section discusses Structured Output Max-Margin IRL, also known as Max-Margin Planning (MMP), an algorithm that learns to plan by solving a Structured Maximum Margin prediction problem over a space of policies. 
+
+Max-Margin IRL, introduced in the previous section, differs from MMP in that the latter allows demonstration of policies from more than a single MDP: they allow demonstrations from multiple feature maps, and with different start and goal states \cite{MMP}.
+
+First, observe that the minimization objective derived in Eq.~\ref{eq:min_obj_mmirl} for the Max-Margin IRL algorithm uses a margin of 1. In contrast, MMP uses the notion of a variable margin, which depends on a distance between policies. This leads to the idea of Structured Prediction Max-Margin:
+\begin{equation}
+    \label{eq:min_obj_mmp}
+    \begin{split}
+        \min\limits_{\theta, \xi} & \quad\lambda ||\boldsymbol\theta||_2 + \sum\limits_i \xi_i \\
+        & \textrm{s.t.} \quad \boldsymbol{\theta}^T(\boldsymbol{\mu}(\pi^\ast) - \boldsymbol{\mu}(\pi)) \geq l(\pi^\ast, \pi_i) - \xi_i \quad \forall i
+    \end{split}
+\end{equation}
+In the above equation, $l(\pi^\ast, \pi)$ is the variable loss (or margin). The intuition behind it is that if two policies are significantly different, then margin should large. One example of a variable loss would be to sample trajectories from different policies and measuring the distance between them. 
+
+The simplified version of the objective function for MMP algorithm can be also expressed as in Eq.~\ref{eq:min_obj_mmp} (we refer the reader to the original paper for a full derivation):
+\begin{equation}
+    \label{eq:min_obj_mmp}
+    \begin{split}
+        \min\limits_{\theta} \frac{1}{2}||\boldsymbol{\theta}||_2 
+        + \lambda \sum\limits_d\big\{ \boldsymbol{\theta}^TF_d\eta + l_d^T\eta  - 
+        \boldsymbol{\theta}^T F_d \eta_d \big\}
+    \end{split}
+\end{equation}
+where $l(\pi^\ast, \pi_d) = l_d^T \eta^\ast$ represents the structural loss (or variable margin) with $\eta(a, s) \in \mathbb{R}^{|S||A|}$ as an occupancy measure that counts the number of times a state-action pair has been visited. Note that the expression above uses an alternative representation of the policy value given by:
+\begin{equation}
+    V(\pi) = \boldsymbol{\theta}^{T} F \eta_\pi
+\end{equation}
+where $F \in \mathbb{R}^{N \times |S||A|}$ is a feature map for each state-action pair, and $\mu = F\eta$ is the expected feature count. 
+
+The final objective for MMP is given by:
+\begin{equation}
+    \label{eq:final_min_obj_mmp}
+    \begin{split}
+        \min\limits_{\theta} \frac{1}{2}||\boldsymbol{\theta}||_2^2
+        + \frac{\lambda}{D} \sum\limits_d \beta_d \big\{ \max\limits_\eta(\boldsymbol{\theta}^T F_d + l_d^T)\eta  - \boldsymbol{\theta}^T F_d \eta_d \big\}
+    \end{split}
+\end{equation}
+
+Note that the objective is similar to the SVM loss:
+\begin{equation}
+    \label{eq:final_min_obj_mmp}
+    \begin{split}
+        \min\limits_{w} \frac{1}{2}||\boldsymbol{w}||_2^2
+        + \frac{1}{M} \sum\limits_{m=1}^M \max\{0, 1 - y_m\boldsymbol{w}^T \boldsymbol{x}_m)\}
+    \end{split}
+\end{equation}
+
+Thus, we can use online (sub)-gradient descent to solve this problem using the sub-gradient update equation below:
+\begin{equation}
+    \boldsymbol{g} = \frac{\partial \mathcal{L}}{\partial \boldsymbol{\theta}} = 
+    \boldsymbol{\theta} + \frac{\lambda}{D} \sum\limits_d \beta_d F_d(\eta^\ast - \eta_d)
+\end{equation}
+
+Finally, in class we covered two versions of the Max-Marging Planning: MMP-batch shown in Algorithm~\ref{algo:mm_planning_batch}, and MMP-online in Algorithm~\ref{algo:mm_planning_online}. We describe the batch version of the algorithm which performs gradient descent over all trajectories, whereas the online version differs in that one trajectory is taken at at time. In line 4, the policy $\pi_d$ is obtained using RL, using all of the trajectories $d$. Line 5 computes the visitation $\eta_d$ count of the state-action pairs. Then, the sub-gradient is computed, and then used to update the parameters. The whole process is repeated for $T$-steps, and afterwards the function returns the final parameters.  
+
+\begin{algorithm}[H]
+    \label{algo:mm_planning_batch}
+    \caption{Max-Margin Planning-Batch}
+    \begin{algorithmic}[1]
+    \Function{MM-PLANNING-BATCH}{$\{ F_d, \eta_d, l_d\}_{d=1}^D, \lambda, \alpha, T$}
+    \State $\boldsymbol\theta \leftarrow 0$
+    \For{$i=1, \dots, T$}
+    \State $\pi_d =$ \Call{RL}{$\boldsymbol\theta^{T} F_d + l_d^T$} $\quad \forall d$
+    \State $\eta_d = $ \Call{CountVisitation}{$(\pi_d)$} $\quad\forall d$
+    \State $g = $ \Call{ComputeSubgrad}{$(\boldsymbol\theta, F_d, l_d, \eta_d)$} $ \quad\forall d$
+    \State $\boldsymbol\theta_n = \boldsymbol\theta_n - \alpha_t \cdot g_n \quad\forall n$
+    \EndFor \\
+    \Return $\boldsymbol\theta$
+    \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+    \label{algo:mm_planning_online}
+    \caption{Max-Margin Planning-Online}
+    \begin{algorithmic}[1]
+    \Function{MM-PLANNING-ONLINE}{$\{ F_d, \eta_d, l_d\}_{d=1}^D, \lambda, \alpha, T$}
+    \State $\boldsymbol\theta \leftarrow 0$
+    \For{$i=1, \dots, T$}
+    \State $\pi_d =$ \Call{RL}{$\boldsymbol\theta^{T} F_d + l_d^T$}
+    \State $\eta_d = $ \Call{CountVisitation}{$(\pi_d)$} 
+    \State $g = $ \Call{ComputeSubgrad}{$(\boldsymbol\theta, F_d, l_d, \eta_d)$} 
+    \State $\boldsymbol\theta_n = \boldsymbol\theta_n - \alpha_t \cdot g_n \quad\forall n$
+    \EndFor \\
+    \Return $\boldsymbol\theta$
+    \EndFunction
+    \end{algorithmic}
+\end{algorithm}
+
+%\section*{References}
+%Include your references here. Please cite any resources you found useful.	
+%Populate the refs.bib file or list your references manually. Be consistent in formatting!
+{
+\bibliography{refs}
+\bibliographystyle{unsrt}
+}
+
+
+%This section provides any relevant background material that was not covered in the lectures, but was found to be useful for understanding the material. 
+%For example, derivations, theory underlying techniques employed, etc. 
+
+%Additionally, this section can summarizes applications or extensions of these techniques found in the literature. 
+
+\end{document} % Done!
+
+
